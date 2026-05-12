@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.atm.menubar</string>
+
+    <!-- Launch the .app's binary directly. This bypasses LaunchServices
+         and gives launchd a real PID to track for KeepAlive. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{ATM_HOME}}/swift/ATMMenuBar.app/Contents/MacOS/atm-menubar</string>
+    </array>
+
+    <!-- Start at login. -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Respawn on crash, but respect Cmd-Q from the user. -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>{{ATM_LOG}}</string>
+    <key>StandardErrorPath</key>
+    <string>{{ATM_LOG}}</string>
+</dict>
+</plist>

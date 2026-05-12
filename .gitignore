@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Personal preset (machine-specific defaults; only meaningful on the
+# original developer's machine — public installs use standard defaults).
+presets/local.preset
+presets/local.preset.stash
+
+# Scratch / discovery notes (personal disk-layout specifics, not for public).
+RECON.md
+
+# Built Swift menubar app — compiled artefact, rebuilt by swift/build.sh.
+swift/ATMMenuBar.app/
+
+# Release tarballs.
+dist/
+
+# Logs and ephemeral state (created by the running agents, never source).
+*.log
+.atm-*
+
+# Editor cruft
+*.swp
+*~
+.idea/
+.vscode/
