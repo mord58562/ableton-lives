@@ -782,7 +782,7 @@ struct StatsView: View {
                     .frame(width: 36, alignment: .trailing)
             }
             if snapshot.recentSaves.isEmpty {
-                Text("No coordinates logged yet. Save in Ableton to begin.")
+                Text("No saves yet. Save a project in Ableton and it'll show up here.")
                     .font(.system(size: 11))
                     .foregroundStyle(Palette.textFaint)
             } else {

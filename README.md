@@ -1,6 +1,6 @@
 # Ableton Lives
 
-Automatic per-`.als` versioning and encrypted backup for Ableton Live projects on macOS. The watcher captures every save within 30 seconds as a content-addressed snapshot, stores it under an internal `_versions/` tree, optionally mirrors to an external drive, and optionally syncs nightly to Google Drive through `rclone crypt` so the cloud only ever sees opaque blobs. A SwiftUI menubar app reports state at a glance. Unlike folder-level rsync backups, every `.als` save is a discrete restorable version with verifiable integrity, and restore happens from a Finder right-click rather than a backup app.
+Every time you save in Ableton, a timestamped copy lands in `_versions/` within 30 seconds. Optionally, that store mirrors to an external drive and syncs nightly to Google Drive through `rclone crypt`, so the cloud only ever sees opaque blobs. A SwiftUI menubar app shows storage used, last sync, alerts, and a Sync button. Restore is a Finder right-click on the `.als`, not a separate backup app.
 
 ## Screenshot
 
@@ -49,7 +49,7 @@ A menubar app and a set of `lives-*` CLI tools under `bin/`. The watcher, pruner
 
 ### Menubar app
 
-`swift/AbletonLives.app` shows current state at a glance: last save time, version count, storage used, sync status, alerts, and a one-click "Sync now" action.
+`swift/AbletonLives.app` shows storage used, last sync time, version count, and recent alerts. A Sync button forces a sync immediately. The menubar icon stays muted; the popover is where everything lives.
 
 ### Finder Quick Action
 
