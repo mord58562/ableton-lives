@@ -1006,6 +1006,9 @@ final class PanelController: NSObject {
         // the item still looks square in the menu bar.
         let item = NSStatusBar.system.statusItem(
             withLength: NSStatusItem.variableLength)
+        // Persist menubar position across launches; also lets users (and
+        // `defaults write`) reorder the icon out from under the notch.
+        item.autosaveName = "AbletonLives"
         if let button = item.button {
             button.image = LivesIcon.template
             button.imagePosition = .imageOnly

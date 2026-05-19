@@ -507,39 +507,16 @@ else
     info ""
     if prompt_yn "Enable cloud sync?" y; then
         WANT_SYNC=1
+        WANT_ENCRYPT=1
         printf '\n'
-        info "${C_BOLD}Two ways to back up:${C_RESET}"
+        info "Cloud sync uses end-to-end encryption (rclone crypt):"
+        info "  ✓ Google sees only opaque blobs - no filenames, no audio"
+        info "  ✗ Two passwords required; lose them and the cloud copy is unrecoverable"
+        info "  ✗ Cannot browse/download from drive.google.com (must use rclone)"
         info ""
-        info "  ${C_BOLD}1) Encrypted${C_RESET} (recommended)"
-        info "     ✓ Google can read nothing - no filenames, no project names, no audio"
-        info "     ✓ Files in Drive look like opaque blobs"
-        info "     ✗ Requires two passwords; lose them and the cloud copy is unrecoverable"
-        info "     ✗ Cannot browse or download from drive.google.com (must use rclone)"
-        info ""
-        info "  ${C_BOLD}2) Unencrypted${C_RESET}"
-        info "     ✓ Files are visible/downloadable from drive.google.com"
-        info "     ✓ Easy to share specific versions with collaborators via Drive links"
-        info "     ✓ No password to manage or lose"
-        info "     ✗ Google has full access to your project files"
-        info ""
-        if prompt_yn "Encrypt the backup so Google can't read it?" y; then
-            WANT_ENCRYPT=1
-            info "Encrypted mode selected. You'll set passwords during sync setup."
-        else
-            WANT_ENCRYPT=0
-            warn "Unencrypted mode selected. Anyone with access to your Google"
-            warn "account (including Google staff under court order) can read your files."
-            if ! prompt_yn "Are you sure?" y; then
-                WANT_ENCRYPT=1
-                info "Switched back to encrypted."
-            fi
-        fi
-        printf '\n'
         info "Setup is interactive: you'll authorize Google in your browser"
-        info "(you choose which Google account to use)."
-        if [[ ${WANT_ENCRYPT} -eq 1 ]]; then
-            info "You'll then enter two strong passwords."
-        fi
+        info "(you choose which Google account to use), then set two strong passwords."
+        info "To opt out of encryption later: bin/lives-config.sh set LIVES_ENCRYPT_BACKUP 0"
     fi
 fi
 

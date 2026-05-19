@@ -34,7 +34,7 @@ The installer is interactive and tells you what it is about to do at each step. 
 4. **zstd.** Installs `zstd` via Homebrew for compact project bundles. Falls back to `gzip` if you skip it.
 5. **Folders to monitor.** Detects your Ableton projects folder (default `~/Music/Ableton`), confirms the path to your User Library, and asks whether you also want to watch an external drive. Missing folders can be created on the spot.
 6. **Storage caps.** Asks for two numbers: the maximum size for the local version store (default 20 GB) and the free-space floor on your Drive (default 10 GB). Either limit pauses sync rather than overrunning your disk or Drive quota.
-7. **Cloud sync intent.** Asks whether to enable nightly sync. If yes, asks whether to encrypt. Encrypted mode (recommended) hides filenames, directory names, and content from Google; unencrypted mode lets you browse the backup from `drive.google.com`.
+7. **Cloud sync intent.** Asks whether to enable nightly sync. If yes, end-to-end encryption is on by default — filenames, directory names, and content are hidden from Google. To opt out of encryption (and browse the backup from `drive.google.com`) run `bin/lives-config.sh set LIVES_ENCRYPT_BACKUP 0` before running `lives-sync-setup.sh`.
 8. **Review and confirm.** Shows every choice in one block before writing anything.
 9. **Config file.** Writes `~/.config/ableton-lives/config` with the chosen values.
 10. **Launch agents.** Renders the `launchd` plist templates with your paths and loads the watcher, pruner, verifier, and crash-watcher agents. The menubar agent loads once the app is built. The sync agent loads only after Drive setup finishes.
