@@ -1,22 +1,22 @@
 #!/usr/bin/env zsh
-# atm-import-existing.sh - One-time import of Ableton's own Backup/ files
-# into the ATM _versions/ store.
+# lives-import-existing.sh - One-time import of Ableton's own Backup/ files
+# into the Ableton Lives _versions/ store.
 #
 # Ableton names its backups: "<name> [YYYY-MM-DD HHMMSS].als"
-# ATM names versions:        "<name>-YYYYMMDD-HHMMSS.als"
+# Ableton Lives names versions:        "<name>-YYYYMMDD-HHMMSS.als"
 #
 # This script converts and imports them on first install (Q2 default: yes).
 # Safe to re-run: skips files already present.
 
 set -euo pipefail
 
-ATM_LIB_DIR="${ATM_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
-source "${ATM_LIB_DIR}/atm-config.sh"
+LIVES_LIB_DIR="${LIVES_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
+source "${LIVES_LIB_DIR}/lives-config.sh"
 
-VERSIONS_DIR="${ATM_VERSIONS_DIR}"
-LOG="${ATM_LOG}"
-USB_ABLETON="${ATM_USB_PATH}"
-INTERNAL_ABLETON="${ATM_INTERNAL_PATH}"
+VERSIONS_DIR="${LIVES_VERSIONS_DIR}"
+LOG="${LIVES_LOG}"
+USB_ABLETON="${LIVES_USB_PATH}"
+INTERNAL_ABLETON="${LIVES_INTERNAL_PATH}"
 
 # Regex for "name [YYYY-MM-DD HHMMSS].als" - zsh chokes if the pattern is
 # inlined into [[ =~ ]] because of the literal parens; assigning to a
@@ -48,20 +48,20 @@ import_backup_dir() {
             mo="${match[2]}"
             dy="${match[3]}"
             time="${match[4]}"
-            atm_ts="${yr}${mo}${dy}-${time}"
+            lives_ts="${yr}${mo}${dy}-${time}"
             # Extract base name (before the bracket)
             base_name=$(printf '%s' "${filename}" | sed 's/ \[.*\]\.als$//')
-            dest="${dest_dir}/${base_name}-${atm_ts}.als"
+            dest="${dest_dir}/${base_name}-${lives_ts}.als"
             if [[ ! -f "${dest}" ]]; then
                 cp -- "${f}" "${dest}"
-                log "[IMPORT] ${project_name}/${base_name}-${atm_ts}.als"
+                log "[IMPORT] ${project_name}/${base_name}-${lives_ts}.als"
             else
                 log "[IMPORT-SKIP] already exists: ${dest}"
             fi
         else
             log "[IMPORT-WARN] could not parse timestamp from: ${filename}"
         fi
-    done < <(find "${backup_dir}" -name '*.als' -maxdepth 1 2>/dev/null)
+    done < <(find "${backup_dir}" -name '*.als' -not -name '._*' -maxdepth 1 2>/dev/null)
 }
 
 log "[IMPORT] scanning for Ableton Backup/ directories"

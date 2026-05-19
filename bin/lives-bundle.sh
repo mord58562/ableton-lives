@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# atm-bundle.sh - whole-project snapshot/restore.
+# lives-bundle.sh - whole-project snapshot/restore.
 #
 # A versioned .als alone often isn't enough to reconstruct a project after
 # disk failure - you also need Samples/, Project Info/, .alc clips, .adv
@@ -7,10 +7,10 @@
 # (excluding Backup/ and _versions/) into a single compressed archive.
 #
 # Usage:
-#   atm-bundle.sh snapshot <project-folder-path> [--note "<note>"]
-#   atm-bundle.sh list [<project>]
-#   atm-bundle.sh restore <project> <bundle-ts> <destination-folder>
-#   atm-bundle.sh size [<project>]
+#   lives-bundle.sh snapshot <project-folder-path> [--note "<note>"]
+#   lives-bundle.sh list [<project>]
+#   lives-bundle.sh restore <project> <bundle-ts> <destination-folder>
+#   lives-bundle.sh size [<project>]
 #
 # Storage: _versions/<project>/_bundles/<YYYYMMDD-HHMMSS>.tar.<comp>
 #          plus a sidecar .meta with original path, size, note.
@@ -19,10 +19,10 @@
 
 set -euo pipefail
 
-ATM_LIB_DIR="${ATM_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
-source "${ATM_LIB_DIR}/atm-config.sh"
-VERSIONS_DIR="${ATM_VERSIONS_DIR}"
-LOG="${ATM_LOG}"
+LIVES_LIB_DIR="${LIVES_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
+source "${LIVES_LIB_DIR}/lives-config.sh"
+VERSIONS_DIR="${LIVES_VERSIONS_DIR}"
+LOG="${LIVES_LOG}"
 
 log() {
     printf '[%s] [BUNDLE] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >> "${LOG}" 2>/dev/null || true
@@ -31,15 +31,15 @@ log() {
 usage() {
     cat <<USAGE
 Usage:
-  atm-bundle.sh snapshot <project-folder> [--note "text"]
-  atm-bundle.sh list [<project>]
-  atm-bundle.sh restore <project> <bundle-ts> <destination-folder>
-  atm-bundle.sh size [<project>]
+  lives-bundle.sh snapshot <project-folder> [--note "text"]
+  lives-bundle.sh list [<project>]
+  lives-bundle.sh restore <project> <bundle-ts> <destination-folder>
+  lives-bundle.sh size [<project>]
 
 Examples:
-  atm-bundle.sh snapshot "/Volumes/MyDrive/ableton/MyProject" --note "before mastering"
-  atm-bundle.sh list "intro lessons"
-  atm-bundle.sh restore "intro lessons" 20260512-093045 ~/Desktop/restored-intro
+  lives-bundle.sh snapshot "/Volumes/MyDrive/ableton/MyProject" --note "before mastering"
+  lives-bundle.sh list "intro lessons"
+  lives-bundle.sh restore "intro lessons" 20260512-093045 ~/Desktop/restored-intro
 USAGE
     exit 1
 }

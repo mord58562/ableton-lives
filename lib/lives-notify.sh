@@ -1,9 +1,9 @@
 #!/usr/bin/env zsh
-# atm-notify.sh - central notification dispatcher for ATM
+# lives-notify.sh - central notification dispatcher for Ableton Lives
 #
-# Source from any ATM script. Provides one function:
+# Source from any Ableton Lives script. Provides one function:
 #
-#   atm_notify_event <category> <status> <title> <message>
+#   lives_notify_event <category> <status> <title> <message>
 #     category: short identifier (e.g., "sync", "prune.large", "crash")
 #     status:   ok | warn | error
 #     title:    notification title (shown bold)
@@ -11,25 +11,25 @@
 #
 # Suppression policy (the whole reason this exists):
 #   - Audit log is ALWAYS written. Useful for menu bar, debugging,
-#     "what did ATM tell me last week" forensics, and tests.
+#     "what did Ableton Lives tell me last week" forensics, and tests.
 #   - The macOS notification fires only when ONE of:
 #       (a) fingerprint (status + message) differs from last for category;
 #       (b) status went from non-ok to ok (a recovery is news);
-#       (c) elapsed since last *fire* > ATM_NOTIFY_DEDUP_HOURS (default 24).
+#       (c) elapsed since last *fire* > LIVES_NOTIFY_DEDUP_HOURS (default 24).
 #   - First-ever event of a given category with status=ok stays silent
 #     (it's the baseline; nothing has gone wrong yet).
-#   - ATM_NO_NOTIFY=1 hard-suppresses the macOS fire (audit log still
+#   - LIVES_NO_NOTIFY=1 hard-suppresses the macOS fire (audit log still
 #     written). Tests must set this; production scripts must not.
 #
 # Files:
-#   ATM_NOTIFY_STATE   ~/.atm-notify-state (key=value, one per line)
-#   ATM_NOTIFY_LOG     ~/Library/Logs/ableton-time-machine-notifications.log
+#   LIVES_NOTIFY_STATE   ~/.ableton-lives-notify-state (key=value, one per line)
+#   LIVES_NOTIFY_LOG     ~/Library/Logs/ableton-lives-notifications.log
 #                      (one tab-separated line per event:
 #                       ISO_TS \t category \t status \t fired \t title \t message)
 
-ATM_NOTIFY_STATE="${ATM_NOTIFY_STATE:-${HOME}/.atm-notify-state}"
-ATM_NOTIFY_LOG="${ATM_NOTIFY_LOG:-${HOME}/Library/Logs/ableton-time-machine-notifications.log}"
-ATM_NOTIFY_DEDUP_HOURS="${ATM_NOTIFY_DEDUP_HOURS:-24}"
+LIVES_NOTIFY_STATE="${LIVES_NOTIFY_STATE:-${HOME}/.ableton-lives-notify-state}"
+LIVES_NOTIFY_LOG="${LIVES_NOTIFY_LOG:-${HOME}/Library/Logs/ableton-lives-notifications.log}"
+LIVES_NOTIFY_DEDUP_HOURS="${LIVES_NOTIFY_DEDUP_HOURS:-24}"
 
 # Read a key from the state file. Empty if absent. Always returns 0 -
 # callers source this lib from scripts with `set -euo pipefail`, where a
@@ -37,19 +37,19 @@ ATM_NOTIFY_DEDUP_HOURS="${ATM_NOTIFY_DEDUP_HOURS:-24}"
 # command substitution and kill the caller after a successful sync.
 _atm_state_get() {
     local key="$1"
-    [[ -f "${ATM_NOTIFY_STATE}" ]] || return 0
-    grep -E "^${key}=" "${ATM_NOTIFY_STATE}" 2>/dev/null | tail -1 | cut -d= -f2- || true
+    [[ -f "${LIVES_NOTIFY_STATE}" ]] || return 0
+    grep -E "^${key}=" "${LIVES_NOTIFY_STATE}" 2>/dev/null | tail -1 | cut -d= -f2- || true
     return 0
 }
 
 # Write/update a key in the state file atomically.
 # Multiple keys per call: _atm_state_set k1 v1 k2 v2 ...
 _atm_state_set() {
-    mkdir -p "$(dirname "${ATM_NOTIFY_STATE}")"
-    local tmp="${ATM_NOTIFY_STATE}.tmp.$$"
+    mkdir -p "$(dirname "${LIVES_NOTIFY_STATE}")"
+    local tmp="${LIVES_NOTIFY_STATE}.tmp.$$"
     : > "${tmp}"
     # Copy existing, dropping keys we're about to set
-    if [[ -f "${ATM_NOTIFY_STATE}" ]]; then
+    if [[ -f "${LIVES_NOTIFY_STATE}" ]]; then
         local skip_pat=""
         local i=1
         while [[ ${i} -le $# ]]; do
@@ -57,7 +57,7 @@ _atm_state_set() {
             [[ -z "${skip_pat}" ]] && skip_pat="^${k}=" || skip_pat="${skip_pat}|^${k}="
             i=$(( i + 2 ))
         done
-        grep -Ev "${skip_pat}" "${ATM_NOTIFY_STATE}" >> "${tmp}" 2>/dev/null || true
+        grep -Ev "${skip_pat}" "${LIVES_NOTIFY_STATE}" >> "${tmp}" 2>/dev/null || true
     fi
     # Append new key/value pairs
     local i=1
@@ -68,7 +68,7 @@ _atm_state_set() {
         printf '%s=%s\n' "${k}" "${v}" >> "${tmp}"
         i=$(( i + 2 ))
     done
-    mv "${tmp}" "${ATM_NOTIFY_STATE}"
+    mv "${tmp}" "${LIVES_NOTIFY_STATE}"
 }
 
 # Compute a stable fingerprint over status+message.
@@ -79,11 +79,11 @@ _atm_fingerprint() {
 # Append a line to the audit log.
 _atm_audit_log() {
     local category="$1" event_status="$2" fired="$3" title="$4" message="$5"
-    mkdir -p "$(dirname "${ATM_NOTIFY_LOG}")"
+    mkdir -p "$(dirname "${LIVES_NOTIFY_LOG}")"
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
         "$(date '+%Y-%m-%dT%H:%M:%S')" \
         "${category}" "${event_status}" "${fired}" \
-        "${title}" "${message}" >> "${ATM_NOTIFY_LOG}"
+        "${title}" "${message}" >> "${LIVES_NOTIFY_LOG}"
 }
 
 # Fire a real macOS notification (no suppression logic here).
@@ -96,7 +96,7 @@ _atm_fire_macos() {
 }
 
 # Public: dispatch an event.
-atm_notify_event() {
+lives_notify_event() {
     local category="$1" event_status="$2" title="$3" message="$4"
     [[ -z "${category}" || -z "${event_status}" ]] && return 2
 
@@ -124,7 +124,7 @@ atm_notify_event() {
             should_fire=1
         else
             # Same problem as last time: fire only if dedup window expired.
-            local dedup_seconds=$(( ATM_NOTIFY_DEDUP_HOURS * 3600 ))
+            local dedup_seconds=$(( LIVES_NOTIFY_DEDUP_HOURS * 3600 ))
             local elapsed=$(( now_epoch - prev_fire_epoch ))
             [[ ${elapsed} -ge ${dedup_seconds} ]] && should_fire=1
         fi
@@ -132,11 +132,11 @@ atm_notify_event() {
 
     # The logical decision (should_fire) is what the audit log records, so
     # tests can verify dispatch policy without touching the OS. The OS call
-    # is separately gated by ATM_NO_NOTIFY.
+    # is separately gated by LIVES_NO_NOTIFY.
     local fired_field="suppressed"
     if [[ ${should_fire} -eq 1 ]]; then
         fired_field="fired"
-        if [[ -z "${ATM_NO_NOTIFY:-}" ]]; then
+        if [[ -z "${LIVES_NO_NOTIFY:-}" ]]; then
             _atm_fire_macos "${title}" "${message}"
         fi
         _atm_state_set \
@@ -159,7 +159,7 @@ atm_notify_event() {
 
 # Public: explicitly mark a category as resolved without sending a
 # notification. Useful when a script wants to clear stale state on startup.
-atm_notify_clear() {
+lives_notify_clear() {
     local category="$1"
     _atm_state_set \
         "${category}.fingerprint" "" \

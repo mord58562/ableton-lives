@@ -1,4 +1,4 @@
-# Ableton Time Machine
+# Ableton Lives
 
 Automatic versioning, encrypted cloud backup, and crash-recovery for Ableton
 Live projects on macOS.
@@ -33,8 +33,8 @@ RAM. The only optional dependency is `rclone` (for cloud sync).
 ## Quick start
 
 ```bash
-git clone https://github.com/<you>/ableton-time-machine.git
-cd ableton-time-machine
+git clone https://github.com/<you>/ableton-lives.git
+cd ableton-lives
 zsh scripts/install.sh
 ```
 
@@ -47,7 +47,7 @@ To enable cloud sync later:
 
 ```bash
 brew install rclone
-bin/atm-sync-setup.sh    # walks you through OAuth + encryption keys
+bin/lives-sync-setup.sh    # walks you through OAuth + encryption keys
 ```
 
 ## Daily use
@@ -63,35 +63,35 @@ recent alerts, and a one-click action to run sync immediately.
 ## CLI tools
 
 ```text
-bin/atm-config.sh            show or change settings (paths, caps, etc.)
-bin/atm-sync.sh              run cloud sync now
-bin/atm-bundle.sh snapshot   archive a whole project folder
-bin/atm-bundle.sh restore    extract a project bundle
-bin/atm-cloud-restore.sh     pull encrypted backup down (disaster recovery)
-bin/atm-tag.sh add           pin a version so it survives forever
-bin/atm-preview.sh           extract BPM / track count from a version
-bin/atm-verify.sh            sample N versions and check integrity
+bin/lives-config.sh            show or change settings (paths, caps, etc.)
+bin/lives-sync.sh              run cloud sync now
+bin/lives-bundle.sh snapshot   archive a whole project folder
+bin/lives-bundle.sh restore    extract a project bundle
+bin/lives-cloud-restore.sh     pull encrypted backup down (disaster recovery)
+bin/lives-tag.sh add           pin a version so it survives forever
+bin/lives-preview.sh           extract BPM / track count from a version
+bin/lives-verify.sh            sample N versions and check integrity
 ```
 
 ## Storage caps
 
-ATM has a hard ceiling on how much it will store, defaulting to **20 GB**.
+Ableton Lives has a hard ceiling on how much it will store, defaulting to **20 GB**.
 If your version store grows past the cap, sync refuses rather than risk
 filling your Drive. Tune any time:
 
 ```bash
-bin/atm-config.sh set ATM_REMOTE_CAP_GB 50
-bin/atm-config.sh set ATM_FREE_FLOOR_GB 5
+bin/lives-config.sh set LIVES_REMOTE_CAP_GB 50
+bin/lives-config.sh set LIVES_FREE_FLOOR_GB 5
 ```
 
 A soft notification fires at 75% of the cap so you have time to react.
 
 ## Multi-machine
 
-Point a second Mac at the same `atm-crypt:` remote (using the same
+Point a second Mac at the same `lives-crypt:` remote (using the same
 passwords), and both machines share one encrypted version store. For
 true bidirectional sync, use `rclone bisync` in place of `rclone sync`
-in `bin/atm-sync.sh`.
+in `bin/lives-sync.sh`.
 
 ## Privacy
 
@@ -104,7 +104,7 @@ in `bin/atm-sync.sh`.
   `~/Library/Logs/DiagnosticReports/`. Only filenames and mtimes are
   used; no crash content is uploaded.
 - A local audit log of notifications is kept at
-  `~/Library/Logs/ableton-time-machine-notifications.log`. Local only.
+  `~/Library/Logs/ableton-lives-notifications.log`. Local only.
 
 ## Uninstall
 

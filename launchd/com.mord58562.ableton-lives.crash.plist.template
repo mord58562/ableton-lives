@@ -3,19 +3,19 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.atm.crash</string>
+    <string>com.mord58562.ableton-lives.crash</string>
     <key>ProgramArguments</key>
     <array>
         <string>/bin/zsh</string>
-        <string>{{ATM_HOME}}/bin/atm-crash-watch.sh</string>
+        <string>{{LIVES_HOME}}/bin/lives-crash-watch.sh</string>
     </array>
     <key>StartInterval</key>
     <integer>300</integer>
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>{{ATM_LOG}}</string>
+    <string>{{LIVES_LOG}}</string>
     <key>StandardErrorPath</key>
-    <string>{{ATM_LOG}}</string>
+    <string>{{LIVES_LOG}}</string>
 </dict>
 </plist>

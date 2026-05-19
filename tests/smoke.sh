@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# smoke.sh - Smoke test for Ableton Time Machine.
+# smoke.sh - Smoke test for Ableton Lives.
 # Tests the copy logic directly against a temp directory WITHOUT touching:
 #   - /Volumes/<your-external>/ (irreplaceable, 100% full)
 #   - ~/Music/Ableton/ (real workspace)
@@ -15,16 +15,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 FIXTURE="${SCRIPT_DIR}/fixtures/fake.als"
-WATCH_SCRIPT="${PROJECT_ROOT}/bin/atm-watch.sh"
+WATCH_SCRIPT="${PROJECT_ROOT}/bin/lives-watch.sh"
 
 # Use /tmp for all smoke test I/O - never touch real paths
-SMOKE_DIR="/tmp/atm-smoke-$$"
+SMOKE_DIR="/tmp/lives-smoke-$$"
 SMOKE_VERSIONS="${SMOKE_DIR}/_versions"
 SMOKE_INTERNAL="${SMOKE_DIR}/internal"
-SMOKE_LOG="${SMOKE_DIR}/atm-smoke.log"
-SMOKE_HASHES="${SMOKE_DIR}/.atm-smoke-hashes"
-SMOKE_SUMMARY="${SMOKE_DIR}/.atm-smoke-summary"
-SMOKE_LOCKFILE="${SMOKE_DIR}/atm-watch.lock"
+SMOKE_LOG="${SMOKE_DIR}/lives-smoke.log"
+SMOKE_HASHES="${SMOKE_DIR}/.ableton-lives-smoke-hashes"
+SMOKE_SUMMARY="${SMOKE_DIR}/.ableton-lives-smoke-summary"
+SMOKE_LOCKFILE="${SMOKE_DIR}/lives-watch.lock"
 
 cleanup() {
     rm -rf "${SMOKE_DIR}"
@@ -39,22 +39,22 @@ TEST_ALS="${SMOKE_INTERNAL}/smoke_project/smoke_track.als"
 cp "${FIXTURE}" "${TEST_ALS}"
 touch "${TEST_ALS}"  # mtime = now
 
-printf '[SMOKE] invoking atm-watch.sh against temp paths\n'
+printf '[SMOKE] invoking lives-watch.sh against temp paths\n'
 
 # Override all paths to point at temp dirs (NOT real workspace)
-ATM_VERSIONS_DIR="${SMOKE_VERSIONS}" \
-ATM_LOG="${SMOKE_LOG}" \
-ATM_SEEN_HASHES="${SMOKE_HASHES}" \
-ATM_SUMMARY="${SMOKE_SUMMARY}" \
-ATM_LOCKFILE="${SMOKE_LOCKFILE}" \
-ATM_INTERNAL_PATH="${SMOKE_INTERNAL}" \
-ATM_USB_PATH="${SMOKE_DIR}/usb2_absent" \
-ATM_MTIME_WINDOW=30 \
+LIVES_VERSIONS_DIR="${SMOKE_VERSIONS}" \
+LIVES_LOG="${SMOKE_LOG}" \
+LIVES_SEEN_HASHES="${SMOKE_HASHES}" \
+LIVES_SUMMARY="${SMOKE_SUMMARY}" \
+LIVES_LOCKFILE="${SMOKE_LOCKFILE}" \
+LIVES_INTERNAL_PATH="${SMOKE_INTERNAL}" \
+LIVES_USB_PATH="${SMOKE_DIR}/usb2_absent" \
+LIVES_MTIME_WINDOW=30 \
     zsh "${WATCH_SCRIPT}"
 exit_code=$?
 
 if [[ "${exit_code}" -ne 0 ]]; then
-    printf '[SMOKE FAIL] atm-watch.sh exited with code %d\n' "${exit_code}"
+    printf '[SMOKE FAIL] lives-watch.sh exited with code %d\n' "${exit_code}"
     printf '[SMOKE] log output:\n'
     cat "${SMOKE_LOG}" 2>/dev/null || true
     exit 1
@@ -96,7 +96,7 @@ fi
 
 printf '[SMOKE PASS] version copy detected: %s\n' "${found_file}"
 printf '[SMOKE PASS] SHA-256 verified: %s\n' "${original_sha}"
-printf '[SMOKE PASS] atm-watch.sh log:\n'
+printf '[SMOKE PASS] lives-watch.sh log:\n'
 cat "${SMOKE_LOG}" 2>/dev/null || true
 printf '\n[SMOKE PASS] all checks passed\n'
 exit 0

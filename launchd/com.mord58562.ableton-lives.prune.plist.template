@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.atm.prune</string>
+    <string>com.mord58562.ableton-lives.prune</string>
     <key>ProgramArguments</key>
     <array>
         <string>/bin/zsh</string>
-        <string>{{ATM_HOME}}/bin/atm-prune.sh</string>
+        <string>{{LIVES_HOME}}/bin/lives-prune.sh</string>
     </array>
     <key>StartCalendarInterval</key>
     <array>
@@ -21,8 +21,8 @@
         </dict>
     </array>
     <key>StandardOutPath</key>
-    <string>{{ATM_LOG}}</string>
+    <string>{{LIVES_LOG}}</string>
     <key>StandardErrorPath</key>
-    <string>{{ATM_LOG}}</string>
+    <string>{{LIVES_LOG}}</string>
 </dict>
 </plist>

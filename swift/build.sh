@@ -1,10 +1,10 @@
 #!/usr/bin/env zsh
-# build.sh - compile and bundle the ATM menubar Swift app.
+# build.sh - compile and bundle the Ableton Lives menubar Swift app.
 #
-# Output:  swift/ATMMenuBar.app/
+# Output:  swift/AbletonLives.app/
 #   Contents/
 #     Info.plist
-#     MacOS/atm-menubar          (the swiftc-compiled binary)
+#     MacOS/ableton-lives-menubar          (the swiftc-compiled binary)
 #
 # Requirements: Xcode Command Line Tools (swiftc, codesign).
 # Install with: xcode-select --install
@@ -16,8 +16,8 @@
 set -euo pipefail
 
 SWIFT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_DIR="${SWIFT_DIR}/ATMMenuBar.app"
-SOURCES="${SWIFT_DIR}/Sources/ATMMenuBar.swift"
+APP_DIR="${SWIFT_DIR}/AbletonLives.app"
+SOURCES="${SWIFT_DIR}/Sources/AbletonLives.swift"
 PLIST="${SWIFT_DIR}/Info.plist"
 
 if [[ "${1:-}" = "--clean" ]]; then
@@ -39,7 +39,7 @@ swiftc -O -whole-module-optimization \
     -framework AppKit \
     -framework SwiftUI \
     -framework Foundation \
-    -o "${APP_DIR}/Contents/MacOS/atm-menubar" \
+    -o "${APP_DIR}/Contents/MacOS/ableton-lives-menubar" \
     "${SOURCES}"
 
 # Ad-hoc signing is enough for launchd. Without it Gatekeeper may prompt

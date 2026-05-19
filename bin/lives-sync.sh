@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# atm-sync.sh - Ableton Time Machine offsite sync (Google Drive, encrypted)
+# lives-sync.sh - Ableton Lives offsite sync (Google Drive, encrypted)
 #
 # Mirrors ~/Music/Ableton/_versions/ to an rclone crypt remote so Google
 # stores only opaque encrypted blobs (no filenames, no project names, no
@@ -7,15 +7,15 @@
 # rotation (04:05).
 #
 # Hard quota guards: refuses to sync if remote free space drops below
-# ATM_FREE_FLOOR_GB or if ATM's cloud footprint would exceed ATM_REMOTE_CAP_GB.
+# LIVES_FREE_FLOOR_GB or if Ableton Lives' cloud footprint would exceed LIVES_REMOTE_CAP_GB.
 # This is the "100 GB plan must never be at risk" invariant.
 #
 # Notifications: silent on success. Notifies only on:
 #   - sync failure
 #   - quota guard tripped (refused to sync)
-#   - drive usage crosses ATM_WARN_USED_PCT post-sync
+#   - drive usage crosses LIVES_WARN_USED_PCT post-sync
 #
-# Setup: run bin/atm-sync-setup.sh once to configure the crypt remote.
+# Setup: run bin/lives-sync-setup.sh once to configure the crypt remote.
 #
 # NOTE: In zsh, 'path' is a special tied variable - never use 'local path=...'.
 
@@ -24,40 +24,40 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Configuration (overridable via env for testing)
 # ---------------------------------------------------------------------------
-ATM_LIB_DIR="${ATM_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
-source "${ATM_LIB_DIR}/atm-config.sh"
+LIVES_LIB_DIR="${LIVES_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
+source "${LIVES_LIB_DIR}/lives-config.sh"
 
-VERSIONS_DIR="${ATM_VERSIONS_DIR}"
-LOG="${ATM_LOG}"
-SUMMARY="${ATM_SUMMARY}"
-LOCKFILE="${ATM_SYNC_LOCKFILE:-/tmp/atm-sync.lock}"
+VERSIONS_DIR="${LIVES_VERSIONS_DIR}"
+LOG="${LIVES_LOG}"
+SUMMARY="${LIVES_SUMMARY}"
+LOCKFILE="${LIVES_SYNC_LOCKFILE:-/tmp/ableton-lives-sync.lock}"
 
-# Remotes are created by atm-sync-setup.sh.
-#   ATM_QUOTA_REMOTE = raw Drive remote, used ONLY for `rclone about` quota
+# Remotes are created by lives-sync-setup.sh.
+#   LIVES_QUOTA_REMOTE = raw Drive remote, used ONLY for `rclone about` quota
 #                      queries (crypt remotes don't support `about`).
-#   ATM_SYNC_REMOTE  = crypt remote that wraps the raw remote. ALL file
+#   LIVES_SYNC_REMOTE  = crypt remote that wraps the raw remote. ALL file
 #                      content flows here, encrypted client-side; Google
 #                      sees only opaque blobs.
-QUOTA_REMOTE="${ATM_QUOTA_REMOTE}"
-SYNC_REMOTE="${ATM_SYNC_REMOTE}"
-SYNC_PATH="${ATM_SYNC_PATH}"
+QUOTA_REMOTE="${LIVES_QUOTA_REMOTE}"
+SYNC_REMOTE="${LIVES_SYNC_REMOTE}"
+SYNC_PATH="${LIVES_SYNC_PATH}"
 
-# Quota guards (defaults set in lib/atm-config.sh; user-tunable via
-# `atm config set ATM_REMOTE_CAP_GB 50` etc.). All integer GB.
+# Quota guards (defaults set in lib/lives-config.sh; user-tunable via
+# `atm config set LIVES_REMOTE_CAP_GB 50` etc.). All integer GB.
 
 # Safety: cap how many files a single sync can delete, so a wiped local
 # _versions/ cannot nuke the entire remote in one run. Google Drive trash
 # also retains deleted files for 30 days as a second line of defence.
-ATM_MAX_DELETE="${ATM_MAX_DELETE:-100}"
+LIVES_MAX_DELETE="${LIVES_MAX_DELETE:-100}"
 
 # rclone binary (overridable for testing with a stub)
-RCLONE="${ATM_RCLONE:-rclone}"
+RCLONE="${LIVES_RCLONE:-rclone}"
 
 # ---------------------------------------------------------------------------
 # Notification dispatcher (state-transition aware, dedup-aware, audit-logged)
 # ---------------------------------------------------------------------------
-ATM_LIB_DIR="${ATM_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
-source "${ATM_LIB_DIR}/atm-notify.sh"
+LIVES_LIB_DIR="${LIVES_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
+source "${LIVES_LIB_DIR}/lives-notify.sh"
 
 log() {
     printf '[%s] [SYNC] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >> "${LOG}" 2>/dev/null || true
@@ -120,9 +120,9 @@ if [[ -z "${remotes}" ]]; then
         config_problem="rclone installed but no remotes configured"
     fi
 elif ! printf '%s' "${remotes}" | grep -qx "${QUOTA_REMOTE}:"; then
-    config_problem="quota remote '${QUOTA_REMOTE}:' missing - run atm-sync-setup.sh"
+    config_problem="quota remote '${QUOTA_REMOTE}:' missing - run lives-sync-setup.sh"
 elif ! printf '%s' "${remotes}" | grep -qx "${SYNC_REMOTE}:"; then
-    config_problem="crypt remote '${SYNC_REMOTE}:' missing - run atm-sync-setup.sh"
+    config_problem="crypt remote '${SYNC_REMOTE}:' missing - run lives-sync-setup.sh"
 fi
 
 if [[ -n "${config_problem}" ]]; then
@@ -141,7 +141,7 @@ fi
 about_json=$("${RCLONE}" about "${QUOTA_REMOTE}:" --json 2>>"${LOG}" || true)
 if [[ -z "${about_json}" ]]; then
     log "ABORT: could not query Drive quota via '${QUOTA_REMOTE}:'"
-    atm_notify_event "sync.network" "error" "ATM sync: cannot reach Drive" \
+    lives_notify_event "sync.network" "error" "Ableton Lives sync: cannot reach Drive" \
         "rclone could not query the Drive quota. Check internet / re-auth: rclone config reconnect ${QUOTA_REMOTE}:"
     exit 1
 fi
@@ -155,38 +155,38 @@ free_gb=$(bytes_to_gb "${free_bytes}")
 
 log "drive quota: used=${used_gb}GB free=${free_gb}GB total=${total_gb}GB"
 
-if [[ "${free_gb}" -lt "${ATM_FREE_FLOOR_GB}" ]]; then
-    log "ABORT: Drive free ${free_gb}GB below floor ${ATM_FREE_FLOOR_GB}GB"
-    atm_notify_event "sync.drive_quota" "warn" "ATM sync paused: Drive nearly full" \
-        "Drive has ${free_gb}GB free (need ${ATM_FREE_FLOOR_GB}GB). Free space or lower ATM_FREE_FLOOR_GB."
+if [[ "${free_gb}" -lt "${LIVES_FREE_FLOOR_GB}" ]]; then
+    log "ABORT: Drive free ${free_gb}GB below floor ${LIVES_FREE_FLOOR_GB}GB"
+    lives_notify_event "sync.drive_quota" "warn" "Ableton Lives sync paused: Drive nearly full" \
+        "Drive has ${free_gb}GB free (need ${LIVES_FREE_FLOOR_GB}GB). Free space or lower LIVES_FREE_FLOOR_GB."
     exit 1
 fi
 
 # ---------------------------------------------------------------------------
-# Quota guard 2: ATM cloud footprint must not exceed cap
+# Quota guard 2: Ableton Lives cloud footprint must not exceed cap
 # ---------------------------------------------------------------------------
 local_bytes=$(du -sk "${VERSIONS_DIR}" 2>/dev/null | awk '{print $1 * 1024}')
 local_gb=$(bytes_to_gb "${local_bytes}")
 
-# Current remote ATM size (skipped on first run if path doesn't exist yet)
+# Current remote Ableton Lives size (skipped on first run if path doesn't exist yet)
 remote_size_json=$("${RCLONE}" size "${SYNC_REMOTE}:${SYNC_PATH}" --json 2>/dev/null || true)
 remote_bytes=$(json_int bytes "${remote_size_json}")
 remote_gb=$(bytes_to_gb "${remote_bytes}")
 
-log "footprint: local=${local_gb}GB remote=${remote_gb}GB cap=${ATM_REMOTE_CAP_GB}GB"
+log "footprint: local=${local_gb}GB remote=${remote_gb}GB cap=${LIVES_REMOTE_CAP_GB}GB"
 
-if [[ "${local_gb}" -gt "${ATM_REMOTE_CAP_GB}" ]]; then
-    log "ABORT: local _versions/ ${local_gb}GB exceeds cap ${ATM_REMOTE_CAP_GB}GB"
-    atm_notify_event "sync.atm_cap" "error" "ATM sync paused: cap exceeded" \
-        "_versions/ is ${local_gb}GB, over ${ATM_REMOTE_CAP_GB}GB cap. Tighten retention or raise ATM_REMOTE_CAP_GB."
+if [[ "${local_gb}" -gt "${LIVES_REMOTE_CAP_GB}" ]]; then
+    log "ABORT: local _versions/ ${local_gb}GB exceeds cap ${LIVES_REMOTE_CAP_GB}GB"
+    lives_notify_event "sync.cap" "error" "Ableton Lives sync paused: cap exceeded" \
+        "_versions/ is ${local_gb}GB, over ${LIVES_REMOTE_CAP_GB}GB cap. Tighten retention or raise LIVES_REMOTE_CAP_GB."
     exit 1
 fi
 
-cap_warn_gb=$(( ATM_REMOTE_CAP_GB * ATM_CAP_WARN_PCT / 100 ))
+cap_warn_gb=$(( LIVES_REMOTE_CAP_GB * LIVES_CAP_WARN_PCT / 100 ))
 if [[ "${local_gb}" -ge "${cap_warn_gb}" ]]; then
-    log "WARN: local _versions/ ${local_gb}GB at ${ATM_CAP_WARN_PCT}%+ of cap (${cap_warn_gb}/${ATM_REMOTE_CAP_GB}GB)"
-    atm_notify_event "sync.atm_cap" "warn" "ATM sync: nearing cap" \
-        "_versions/ is ${local_gb}GB of ${ATM_REMOTE_CAP_GB}GB cap (${ATM_CAP_WARN_PCT}%+)."
+    log "WARN: local _versions/ ${local_gb}GB at ${LIVES_CAP_WARN_PCT}%+ of cap (${cap_warn_gb}/${LIVES_REMOTE_CAP_GB}GB)"
+    lives_notify_event "sync.cap" "warn" "Ableton Lives sync: nearing cap" \
+        "_versions/ is ${local_gb}GB of ${LIVES_REMOTE_CAP_GB}GB cap (${LIVES_CAP_WARN_PCT}%+)."
 fi
 
 # ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ sync_ok=1
 if "${RCLONE}" sync "${VERSIONS_DIR}" "${SYNC_REMOTE}:${SYNC_PATH}" \
     --size-only \
     --transfers 4 \
-    --max-delete "${ATM_MAX_DELETE}" \
+    --max-delete "${LIVES_MAX_DELETE}" \
     --no-update-modtime \
     --stats 1s --stats-one-line \
     --log-file "${LOG}" \
@@ -225,12 +225,12 @@ if [[ "${sync_ok}" -eq 0 ]]; then
         | sed 's/.*ERROR : //; s/.*Failed [^:]*: //; s/^[[:space:]]*//' \
         | cut -c1-100)
     log "FAILED after ${sync_dur}s: ${last_err:-see log}"
-    atm_notify_event "sync.run" "error" "ATM sync failed" \
+    lives_notify_event "sync.run" "error" "Ableton Lives sync failed" \
         "${last_err:-rclone exited non-zero} (after ${sync_dur}s). See log for full trace."
     _atm_sync_status="failed"
 else
     log "ok in ${sync_dur}s"
-    atm_notify_event "sync.run" "ok" "ATM sync recovered" \
+    lives_notify_event "sync.run" "ok" "Ableton Lives sync recovered" \
         "Backup is current again (took ${sync_dur}s)."
     _atm_sync_status="ok"
 fi
@@ -255,9 +255,9 @@ if [[ "${post_total_bytes}" -gt 0 ]]; then
     # integer percent: 100 * used / total
     post_pct=$(( 100 * post_used_bytes / post_total_bytes ))
     log "post-sync drive used ${post_used_gb}GB (${post_pct}%)"
-    if [[ "${post_pct}" -ge "${ATM_WARN_USED_PCT}" ]]; then
-        atm_notify_event "sync.drive_full" "warn" "Drive ${post_pct}% full" \
-            "${post_used_gb}GB used. Free space or lower ATM_REMOTE_CAP_GB before sync starts refusing."
+    if [[ "${post_pct}" -ge "${LIVES_WARN_USED_PCT}" ]]; then
+        lives_notify_event "sync.drive_full" "warn" "Drive ${post_pct}% full" \
+            "${post_used_gb}GB used. Free space or lower LIVES_REMOTE_CAP_GB before sync starts refusing."
     fi
 fi
 
@@ -272,14 +272,14 @@ mkdir -p "$(dirname "${SUMMARY}")"
 [[ -f "${SUMMARY}" ]] || : > "${SUMMARY}"
 
 tmp_sum="${SUMMARY}.sync.tmp.$$"
-grep -v '^ATM_SYNC_' "${SUMMARY}" > "${tmp_sum}" 2>/dev/null || true
+grep -v '^LIVES_SYNC_' "${SUMMARY}" > "${tmp_sum}" 2>/dev/null || true
 {
-    printf 'ATM_SYNC_LAST_RUN=%s\n' "${now_iso}"
-    printf 'ATM_SYNC_LAST_STATUS=%s\n' "${_atm_sync_status}"
-    printf 'ATM_SYNC_LAST_DURATION_S=%d\n' "${sync_dur}"
-    printf 'ATM_SYNC_REMOTE_BYTES=%d\n' "${remote_bytes}"
-    printf 'ATM_SYNC_DRIVE_USED_BYTES=%d\n' "${post_used_bytes:-0}"
-    printf 'ATM_SYNC_DRIVE_TOTAL_BYTES=%d\n' "${post_total_bytes:-0}"
+    printf 'LIVES_SYNC_LAST_RUN=%s\n' "${now_iso}"
+    printf 'LIVES_SYNC_LAST_STATUS=%s\n' "${_atm_sync_status}"
+    printf 'LIVES_SYNC_LAST_DURATION_S=%d\n' "${sync_dur}"
+    printf 'LIVES_SYNC_REMOTE_BYTES=%d\n' "${remote_bytes}"
+    printf 'LIVES_SYNC_DRIVE_USED_BYTES=%d\n' "${post_used_bytes:-0}"
+    printf 'LIVES_SYNC_DRIVE_TOTAL_BYTES=%d\n' "${post_total_bytes:-0}"
 } >> "${tmp_sum}"
 mv "${tmp_sum}" "${SUMMARY}"
 

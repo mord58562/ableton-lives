@@ -6,28 +6,28 @@
 
 FIXTURE="$(cd "$(dirname "${BATS_TEST_FILENAME}")" && pwd)/fixtures/fake.als"
 FIXTURE_V2="$(cd "$(dirname "${BATS_TEST_FILENAME}")" && pwd)/fixtures/fake_v2.als"
-WATCH_SCRIPT="$(cd "$(dirname "${BATS_TEST_FILENAME}")/.." && pwd)/bin/atm-watch.sh"
-RESTORE_SCRIPT="$(cd "$(dirname "${BATS_TEST_FILENAME}")/.." && pwd)/bin/atm-restore.sh"
+WATCH_SCRIPT="$(cd "$(dirname "${BATS_TEST_FILENAME}")/.." && pwd)/bin/lives-watch.sh"
+RESTORE_SCRIPT="$(cd "$(dirname "${BATS_TEST_FILENAME}")/.." && pwd)/bin/lives-restore.sh"
 
 setup() {
-    TEST_DIR="$(mktemp -d /tmp/atm-test-roundtrip.XXXXXX)"
+    TEST_DIR="$(mktemp -d /tmp/lives-test-roundtrip.XXXXXX)"
     export TEST_DIR
 
-    export ATM_CONFIG=/dev/null
-    export ATM_VERSIONS_DIR="${TEST_DIR}/_versions"
-    export ATM_LOG="${TEST_DIR}/atm.log"
-    export ATM_SEEN_HASHES="${TEST_DIR}/.atm-seen-hashes"
-    export ATM_SUMMARY="${TEST_DIR}/.atm-summary"
-    export ATM_LOCKFILE="${TEST_DIR}/atm-watch.lock"
-    export ATM_MTIME_WINDOW=30
-    export ATM_INTERNAL_PATH="${TEST_DIR}/internal"
-    export ATM_USB_PATH="${TEST_DIR}/usb2_absent"
+    export LIVES_CONFIG=/dev/null
+    export LIVES_VERSIONS_DIR="${TEST_DIR}/_versions"
+    export LIVES_LOG="${TEST_DIR}/atm.log"
+    export LIVES_SEEN_HASHES="${TEST_DIR}/.ableton-lives-seen-hashes"
+    export LIVES_SUMMARY="${TEST_DIR}/.ableton-lives-summary"
+    export LIVES_LOCKFILE="${TEST_DIR}/lives-watch.lock"
+    export LIVES_MTIME_WINDOW=30
+    export LIVES_INTERNAL_PATH="${TEST_DIR}/internal"
+    export LIVES_USB_PATH="${TEST_DIR}/usb2_absent"
 
-    mkdir -p "${ATM_VERSIONS_DIR}" "${ATM_INTERNAL_PATH}"
+    mkdir -p "${LIVES_VERSIONS_DIR}" "${LIVES_INTERNAL_PATH}"
 
     # Create a project directory
     PROJECT_NAME="test_roundtrip_project"
-    PROJECT_DIR="${ATM_INTERNAL_PATH}/${PROJECT_NAME}"
+    PROJECT_DIR="${LIVES_INTERNAL_PATH}/${PROJECT_NAME}"
     mkdir -p "${PROJECT_DIR}"
     export PROJECT_NAME PROJECT_DIR
 
@@ -37,7 +37,7 @@ setup() {
 
 teardown() {
     rm -rf "${TEST_DIR}"
-    rm -f "${ATM_LOCKFILE}" 2>/dev/null || true
+    rm -f "${LIVES_LOCKFILE}" 2>/dev/null || true
 }
 
 @test "full_restore_roundtrip - write v1, copy, modify to v2, copy, restore v1, assert byte-equal" {
@@ -54,12 +54,12 @@ teardown() {
 
     # Verify version 1 exists in _versions/
     local v1_count
-    v1_count=$(find "${ATM_VERSIONS_DIR}/${PROJECT_NAME}" -name 'my_track-*.als' 2>/dev/null | wc -l | tr -d ' ')
+    v1_count=$(find "${LIVES_VERSIONS_DIR}/${PROJECT_NAME}" -name 'my_track-*.als' 2>/dev/null | wc -l | tr -d ' ')
     [ "${v1_count}" -ge 1 ]
 
     # Get the timestamp of v1
     local ts_v1
-    ts_v1=$(find "${ATM_VERSIONS_DIR}/${PROJECT_NAME}" -name 'my_track-*.als' \
+    ts_v1=$(find "${LIVES_VERSIONS_DIR}/${PROJECT_NAME}" -name 'my_track-*.als' \
         | sed 's|.*/||;s/my_track-//;s/\.als$//' | sort | head -1)
     [ -n "${ts_v1}" ]
 
@@ -78,16 +78,16 @@ teardown() {
 
     # Step 4: Run watcher again to copy version 2
     # Reset lockfile (previous run cleaned it up, but just in case)
-    rm -f "${ATM_LOCKFILE}"
+    rm -f "${LIVES_LOCKFILE}"
     run zsh "${WATCH_SCRIPT}"
     [ "${status}" -eq 0 ]
 
     # Verify two versions now exist
     local total_versions
-    total_versions=$(find "${ATM_VERSIONS_DIR}/${PROJECT_NAME}" -name 'my_track-*.als' 2>/dev/null | wc -l | tr -d ' ')
+    total_versions=$(find "${LIVES_VERSIONS_DIR}/${PROJECT_NAME}" -name 'my_track-*.als' 2>/dev/null | wc -l | tr -d ' ')
     [ "${total_versions}" -ge 2 ]
 
-    # Step 5: Restore version 1 using atm-restore.sh --restore
+    # Step 5: Restore version 1 using lives-restore.sh --restore
     run zsh "${RESTORE_SCRIPT}" --restore "${PROJECT_NAME}" "${ts_v1}" "${ALS_FILE}"
     [ "${status}" -eq 0 ]
 
@@ -105,7 +105,7 @@ teardown() {
 
 @test "restore_list_returns_newest_first - versions listed with newest timestamp at top" {
     # Create two versioned files with distinct timestamps (older first)
-    local proj_dir="${ATM_VERSIONS_DIR}/${PROJECT_NAME}"
+    local proj_dir="${LIVES_VERSIONS_DIR}/${PROJECT_NAME}"
     mkdir -p "${proj_dir}"
 
     # Create older version
@@ -135,7 +135,7 @@ teardown() {
     local original_sha
     original_sha=$(shasum -a 256 "${ALS_FILE}" | awk '{print $1}')
 
-    local proj_dir="${ATM_VERSIONS_DIR}/${PROJECT_NAME}"
+    local proj_dir="${LIVES_VERSIONS_DIR}/${PROJECT_NAME}"
     mkdir -p "${proj_dir}"
     cp "${FIXTURE_V2}" "${proj_dir}/my_track-20260112-100000.als"
 
@@ -160,7 +160,7 @@ teardown() {
 }
 
 @test "restore_nonexistent_version_exits_nonzero - error on unknown timestamp" {
-    local proj_dir="${ATM_VERSIONS_DIR}/${PROJECT_NAME}"
+    local proj_dir="${LIVES_VERSIONS_DIR}/${PROJECT_NAME}"
     mkdir -p "${proj_dir}"
 
     run zsh "${RESTORE_SCRIPT}" --restore "${PROJECT_NAME}" "99991231-235959" "${ALS_FILE}"

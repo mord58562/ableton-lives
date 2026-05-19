@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# atm-crash-watch.sh - detect Ableton Live crashes, tag the closest
+# lives-crash-watch.sh - detect Ableton Live crashes, tag the closest
 # preceding version snapshot so recovery is one click away.
 #
 # macOS writes crash reports to ~/Library/Logs/DiagnosticReports/. For
@@ -10,27 +10,27 @@
 #   1. Read the crash file's mtime as the crash time.
 #   2. Find the .als version with the closest mtime BEFORE the crash time
 #      across all projects.
-#   3. Add an atm-tag pin labelled "pre-crash-<crash-ts>" so it survives
+#   3. Add an lives-tag pin labelled "pre-crash-<crash-ts>" so it survives
 #      every retention zone.
-#   4. Write/refresh ~/.atm-last-crash with structured info the menu bar reads.
+#   4. Write/refresh ~/.ableton-lives-last-crash with structured info the menu bar reads.
 #   5. Fire one notification (state-transition aware - same crash file
 #      doesn't re-notify).
 #
-# State: ~/.atm-crash-seen records the basename of every processed crash
+# State: ~/.ableton-lives-crash-seen records the basename of every processed crash
 # file so we only act on new ones.
 
 set -euo pipefail
 
-ATM_LIB_DIR="${ATM_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
-source "${ATM_LIB_DIR}/atm-config.sh"
-source "${ATM_LIB_DIR}/atm-notify.sh"
+LIVES_LIB_DIR="${LIVES_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
+source "${LIVES_LIB_DIR}/lives-config.sh"
+source "${LIVES_LIB_DIR}/lives-notify.sh"
 
-VERSIONS_DIR="${ATM_VERSIONS_DIR}"
-LOG="${ATM_LOG}"
-CRASH_DIR="${ATM_CRASH_DIR:-${HOME}/Library/Logs/DiagnosticReports}"
-SEEN="${ATM_CRASH_SEEN:-${HOME}/.atm-crash-seen}"
-MARKER="${ATM_CRASH_MARKER:-${HOME}/.atm-last-crash}"
-TAG_BIN="${ATM_TAG_BIN:-$(cd "$(dirname "$0")" && pwd)/atm-tag.sh}"
+VERSIONS_DIR="${LIVES_VERSIONS_DIR}"
+LOG="${LIVES_LOG}"
+CRASH_DIR="${LIVES_CRASH_DIR:-${HOME}/Library/Logs/DiagnosticReports}"
+SEEN="${LIVES_CRASH_SEEN:-${HOME}/.ableton-lives-crash-seen}"
+MARKER="${LIVES_CRASH_MARKER:-${HOME}/.ableton-lives-last-crash}"
+TAG_BIN="${LIVES_TAG_BIN:-$(cd "$(dirname "$0")" && pwd)/lives-tag.sh}"
 
 log() {
     printf '[%s] [CRASH] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >> "${LOG}" 2>/dev/null || true
@@ -42,9 +42,9 @@ mkdir -p "$(dirname "${LOG}")" "$(dirname "${SEEN}")"
 [[ ! -d "${VERSIONS_DIR}" ]] && exit 0
 
 # First-run guard: if the seen-file does NOT exist yet, this is the first
-# time atm-crash-watch.sh has run on this machine. Pre-populate it with
+# time lives-crash-watch.sh has run on this machine. Pre-populate it with
 # every existing crash report so we never retroactively fire notifications
-# for crashes from before ATM was installed (which was the bug where the
+# for crashes from before Ableton Lives was installed (which was the bug where the
 # menubar showed "Ableton crashed Xh ago" even when Ableton hadn't been
 # open). After this point, only NEW crash files trigger.
 if [[ ! -f "${SEEN}" ]]; then
@@ -101,7 +101,7 @@ find_pre_crash_version() {
             best_mt=${mt}
             best="${f}"
         fi
-    done < <(find "${VERSIONS_DIR}" -name '*.als' -not -path '*/_exports/*' -not -path '*/_bundles/*' 2>/dev/null)
+    done < <(find "${VERSIONS_DIR}" -name '*.als' -not -name '._*' -not -path '*/_exports/*' -not -path '*/_bundles/*' 2>/dev/null)
     [[ -n "${best}" ]] && printf '%s\n' "${best}"
 }
 
@@ -122,7 +122,7 @@ while IFS= read -r crash_file; do
         continue
     fi
 
-    # Derive project + ts to feed atm-tag
+    # Derive project + ts to feed lives-tag
     project=$(basename "$(dirname "${pre_version}")")
     pre_ts=$(basename "${pre_version}" | grep -oE '[0-9]{8}-[0-9]{6}' | head -1)
     label="pre-crash-${crash_tag_ts}"
@@ -136,18 +136,18 @@ while IFS= read -r crash_file; do
     # Write/refresh marker (atomic). The menu bar reads this.
     tmp="${MARKER}.tmp.$$"
     cat > "${tmp}" <<MARKER
-ATM_CRASH_FILE=${crash_bn}
-ATM_CRASH_AT=${crash_iso}
-ATM_CRASH_EPOCH=${crash_epoch}
-ATM_CRASH_PROJECT=${project}
-ATM_CRASH_PRE_VERSION_TS=${pre_ts}
-ATM_CRASH_PRE_VERSION_PATH=${pre_version}
-ATM_CRASH_TAG_LABEL=${label}
+LIVES_CRASH_FILE=${crash_bn}
+LIVES_CRASH_AT=${crash_iso}
+LIVES_CRASH_EPOCH=${crash_epoch}
+LIVES_CRASH_PROJECT=${project}
+LIVES_CRASH_PRE_VERSION_TS=${pre_ts}
+LIVES_CRASH_PRE_VERSION_PATH=${pre_version}
+LIVES_CRASH_TAG_LABEL=${label}
 MARKER
     mv "${tmp}" "${MARKER}"
 
     # State-transition aware - one notification per unique crash file.
-    atm_notify_event "crash.detected" "warn" "Ableton crashed - recovery ready" \
+    lives_notify_event "crash.detected" "warn" "Ableton crashed - recovery ready" \
         "Tagged ${project}/${pre_ts} as ${label}. Right-click the .als in Finder to restore."
 
     printf '%s\n' "${crash_bn}" >> "${SEEN}"

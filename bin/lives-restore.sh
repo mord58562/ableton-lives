@@ -1,28 +1,28 @@
 #!/usr/bin/env zsh
-# atm-restore.sh - Ableton Time Machine restore tool
+# lives-restore.sh - Ableton Lives restore tool
 # Usage:
-#   atm-restore.sh --list <project-name>
+#   lives-restore.sh --list <project-name>
 #     Prints available version timestamps for the project, newest first.
 #     One entry per line in format: YYYYMMDD-HHMMSS
 #
-#   atm-restore.sh --restore <project-name> <timestamp> <destination-als-path>
+#   lives-restore.sh --restore <project-name> <timestamp> <destination-als-path>
 #     Backs up destination to <destination>.bak, then copies the versioned
 #     file to destination.
 #
 # D5 invariant: .als.bak is ALWAYS written before any overwrite.
 #
-# VERSIONS_DIR can be overridden via ATM_VERSIONS_DIR for testing.
+# VERSIONS_DIR can be overridden via LIVES_VERSIONS_DIR for testing.
 
 set -euo pipefail
 
-ATM_LIB_DIR="${ATM_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
-source "${ATM_LIB_DIR}/atm-config.sh"
-VERSIONS_DIR="${ATM_VERSIONS_DIR}"
+LIVES_LIB_DIR="${LIVES_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
+source "${LIVES_LIB_DIR}/lives-config.sh"
+VERSIONS_DIR="${LIVES_VERSIONS_DIR}"
 
 usage() {
     printf 'Usage:\n'
-    printf '  atm-restore.sh --list <project-name>\n'
-    printf '  atm-restore.sh --restore <project-name> <timestamp> <dest-als-path>\n'
+    printf '  lives-restore.sh --list <project-name>\n'
+    printf '  lives-restore.sh --restore <project-name> <timestamp> <dest-als-path>\n'
     exit 1
 }
 
@@ -40,7 +40,7 @@ case "${mode}" in
         if [[ ! -d "${project_dir}" ]]; then
             exit 0
         fi
-        find "${project_dir}" -name '*.als' -maxdepth 1 \
+        find "${project_dir}" -name '*.als' -not -name '._*' -maxdepth 1 \
             | sed 's|.*/||' \
             | grep -oE '[0-9]{8}-[0-9]{6}' \
             | sort -r \
@@ -49,13 +49,13 @@ case "${mode}" in
 
     --list-meta)
         # Like --list but each line is enriched with BPM, track count and
-        # size via atm-preview. Used by the Quick Action so the user sees
+        # size via lives-preview. Used by the Quick Action so the user sees
         # context next to each timestamp.
         if [[ ! -d "${project_dir}" ]]; then
             exit 0
         fi
-        preview="$(cd "$(dirname "$0")" && pwd)/atm-preview.sh"
-        find "${project_dir}" -name '*.als' -maxdepth 1 \
+        preview="$(cd "$(dirname "$0")" && pwd)/lives-preview.sh"
+        find "${project_dir}" -name '*.als' -not -name '._*' -maxdepth 1 \
             | sed 's|.*/||' \
             | grep -oE '[0-9]{8}-[0-9]{6}' \
             | sort -r \

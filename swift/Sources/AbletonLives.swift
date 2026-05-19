@@ -1,6 +1,6 @@
-// ATMMenuBar.swift
+// AbletonLives.swift
 //
-// Single-file menubar app for Ableton Time Machine.
+// Single-file menubar app for Ableton Lives.
 // Architecture: NSStatusItem + borderless NSPanel hosting SwiftUI.
 // Lazy: state is read from disk on every panel open. No timers.
 //
@@ -58,17 +58,17 @@ enum Palette {
 // MARK: - State snapshot
 // =============================================================================
 
-struct ATMSnapshot {
+struct LivesSnapshot {
     enum OverallStatus { case allClear, warn, error, crashRecent, notSetUp }
 
     var overall: OverallStatus = .notSetUp
     var statusLabel: String = "Not set up"
 
-    var snapshotCount: Int? = nil       // total .als snapshots ATM has stored
-    var localBytes: Int64? = nil        // size of ATM's local store
+    var snapshotCount: Int? = nil       // total .als snapshots Ableton Lives has stored
+    var localBytes: Int64? = nil        // size of Ableton Lives' local store
 
-    // ATM's own cap (from config) and what's currently in the cloud.
-    var atmRemoteBytes: Int64? = nil    // bytes ATM has uploaded
+    // Ableton Lives' own cap (from config) and what's currently in the cloud.
+    var atmRemoteBytes: Int64? = nil    // bytes Ableton Lives has uploaded
     var atmCapBytes: Int64? = nil       // user's configured cap
 
     var driveUsedBytes: Int64? = nil    // entire Google Drive used
@@ -93,7 +93,7 @@ struct RecentSave {
     let projectName: String
     let basename: String
     let savedAge: String     // when the underlying .als was last modified in Ableton
-    let backedUpAge: String  // when ATM took the snapshot we're showing
+    let backedUpAge: String  // when Ableton Lives took the snapshot we're showing
     let path: String         // snapshot file path (for "reveal in Finder")
 }
 
@@ -106,11 +106,11 @@ struct AlertEntry {
 }
 
 // =============================================================================
-// MARK: - Paths (resolved from ~/.config/atm/config or sane defaults)
+// MARK: - Paths (resolved from ~/.config/ableton-lives/config or sane defaults)
 // =============================================================================
 
-struct ATMPaths {
-    let home: String          // source tree (where bin/atm-sync.sh lives)
+struct LivesPaths {
+    let home: String          // source tree (where bin/lives-sync.sh lives)
     let internalPath: String  // Ableton projects folder
     let usbPath: String       // optional external drive mount; "" if none
     let versionsDir: String
@@ -118,11 +118,12 @@ struct ATMPaths {
     let summary: String
     let notifyLog: String
     let crashMarker: String
-    let atmCapBytes: Int64    // hard ceiling from ATM_REMOTE_CAP_GB
+    let alertsClearedAt: String  // cutoff file; alerts <= this ISO ts are hidden
+    let atmCapBytes: Int64    // hard ceiling from LIVES_REMOTE_CAP_GB
 
-    static func resolve() -> ATMPaths {
+    static func resolve() -> LivesPaths {
         let home = NSHomeDirectory()
-        let configFile = "\(home)/.config/atm/config"
+        let configFile = "\(home)/.config/ableton-lives/config"
         var values: [String: String] = [:]
         if let raw = try? String(contentsOfFile: configFile, encoding: .utf8) {
             for line in raw.split(separator: "\n") {
@@ -139,22 +140,23 @@ struct ATMPaths {
                 }
             }
         }
-        let internalPath = values["ATM_INTERNAL_PATH"] ?? "\(home)/Music/Ableton"
-        let usbPath = values["ATM_USB_PATH"] ?? ""
-        let versions = values["ATM_VERSIONS_DIR"] ?? "\(internalPath)/_versions"
-        let log = values["ATM_LOG"] ?? "\(home)/Library/Logs/ableton-time-machine.log"
-        let summary = values["ATM_SUMMARY"] ?? "\(home)/Documents/.atm-summary"
-        let notify = values["ATM_NOTIFY_LOG"]
-            ?? "\(home)/Library/Logs/ableton-time-machine-notifications.log"
-        let crashMk = values["ATM_CRASH_MARKER"] ?? "\(home)/.atm-last-crash"
-        let capGB = Int64(values["ATM_REMOTE_CAP_GB"] ?? "") ?? 20
+        let internalPath = values["LIVES_INTERNAL_PATH"] ?? "\(home)/Music/Ableton"
+        let usbPath = values["LIVES_USB_PATH"] ?? ""
+        let versions = values["LIVES_VERSIONS_DIR"] ?? "\(internalPath)/_versions"
+        let log = values["LIVES_LOG"] ?? "\(home)/Library/Logs/ableton-lives.log"
+        let summary = values["LIVES_SUMMARY"] ?? "\(home)/Documents/.ableton-lives-summary"
+        let notify = values["LIVES_NOTIFY_LOG"]
+            ?? "\(home)/Library/Logs/ableton-lives-notifications.log"
+        let crashMk = values["LIVES_CRASH_MARKER"] ?? "\(home)/.ableton-lives-last-crash"
+        let clearedAt = values["LIVES_ALERTS_CLEARED_AT"] ?? "\(home)/.ableton-lives-alerts-cleared-at"
+        let capGB = Int64(values["LIVES_REMOTE_CAP_GB"] ?? "") ?? 20
         let capBytes = capGB * 1_073_741_824
-        // ATM_HOME isn't always written to config; fall back to the parent of
+        // LIVES_HOME isn't always written to config; fall back to the parent of
         // this binary's bundle (build.sh installs the .app inside the source
         // tree, so this resolves to the repo root).
         let resolvedHome: String = {
-            if let h = values["ATM_HOME"], !h.isEmpty { return h }
-            // .app/../.. walks up out of swift/ATMMenuBar.app/ to the repo.
+            if let h = values["LIVES_HOME"], !h.isEmpty { return h }
+            // .app/../.. walks up out of swift/AbletonLives.app/ to the repo.
             // URL.deletingLastPathComponent() is the modern, type-correct path.
             let bundleURL = URL(fileURLWithPath: Bundle.main.bundlePath)
             return bundleURL
@@ -162,7 +164,7 @@ struct ATMPaths {
                 .deletingLastPathComponent()
                 .path
         }()
-        return ATMPaths(home: resolvedHome,
+        return LivesPaths(home: resolvedHome,
                         internalPath: internalPath,
                         usbPath: usbPath,
                         versionsDir: versions,
@@ -170,6 +172,7 @@ struct ATMPaths {
                         summary: summary,
                         notifyLog: notify,
                         crashMarker: crashMk,
+                        alertsClearedAt: clearedAt,
                         atmCapBytes: capBytes)
     }
 }
@@ -178,39 +181,39 @@ struct ATMPaths {
 // MARK: - Snapshot reading
 // =============================================================================
 
-extension ATMSnapshot {
-    static func read(paths: ATMPaths) -> ATMSnapshot {
-        var s = ATMSnapshot()
+extension LivesSnapshot {
+    static func read(paths: LivesPaths) -> LivesSnapshot {
+        var s = LivesSnapshot()
 
         // ---- Summary KEY=VALUE (drive quota + last-sync info only; the
         // version count + local bytes are derived from the disk walk
         // below so we never disagree with what's actually on disk).
         let summary = parseKeyValueFile(paths.summary)
 
-        if let used = summary["ATM_SYNC_DRIVE_USED_BYTES"].flatMap(Int64.init),
+        if let used = summary["LIVES_SYNC_DRIVE_USED_BYTES"].flatMap(Int64.init),
            used > 0 {
             s.driveUsedBytes = used
         }
-        if let total = summary["ATM_SYNC_DRIVE_TOTAL_BYTES"].flatMap(Int64.init),
+        if let total = summary["LIVES_SYNC_DRIVE_TOTAL_BYTES"].flatMap(Int64.init),
            total > 0 {
             s.driveTotalBytes = total
         }
-        if let remote = summary["ATM_SYNC_REMOTE_BYTES"].flatMap(Int64.init),
+        if let remote = summary["LIVES_SYNC_REMOTE_BYTES"].flatMap(Int64.init),
            remote > 0 {
             s.atmRemoteBytes = remote
         }
         s.atmCapBytes = paths.atmCapBytes
-        if let st = summary["ATM_SYNC_LAST_STATUS"], !st.isEmpty {
+        if let st = summary["LIVES_SYNC_LAST_STATUS"], !st.isEmpty {
             s.lastSyncStatus = st
         }
-        if let runIso = summary["ATM_SYNC_LAST_RUN"],
+        if let runIso = summary["LIVES_SYNC_LAST_RUN"],
            let date = isoDate(runIso) {
             s.lastSyncAge = humanAge(from: date)
         }
 
         // ---- Single disk walk: count + bytes + top-3 saves with both
         // "saved in Ableton" mtime (from the original .als if findable)
-        // and "backed up by ATM" mtime (from the snapshot itself).
+        // and "backed up by Ableton Lives" mtime (from the snapshot itself).
         let walk = walkVersions(under: paths.versionsDir,
                                 internalPath: paths.internalPath,
                                 usbPath: paths.usbPath)
@@ -220,22 +223,24 @@ extension ATMSnapshot {
 
         // ---- Crash marker
         let crashKV = parseKeyValueFile(paths.crashMarker)
-        if let epochStr = crashKV["ATM_CRASH_EPOCH"],
+        if let epochStr = crashKV["LIVES_CRASH_EPOCH"],
            let epoch = TimeInterval(epochStr) {
             let crashDate = Date(timeIntervalSince1970: epoch)
             // Only treat as actionable if within 24h
             if Date().timeIntervalSince(crashDate) < 86_400 {
                 s.crash = CrashInfo(
-                    projectName: crashKV["ATM_CRASH_PROJECT"] ?? "(unknown)",
-                    preVersionTimestamp: crashKV["ATM_CRASH_PRE_VERSION_TS"] ?? "",
-                    preVersionPath: crashKV["ATM_CRASH_PRE_VERSION_PATH"] ?? "",
+                    projectName: crashKV["LIVES_CRASH_PROJECT"] ?? "(unknown)",
+                    preVersionTimestamp: crashKV["LIVES_CRASH_PRE_VERSION_TS"] ?? "",
+                    preVersionPath: crashKV["LIVES_CRASH_PRE_VERSION_PATH"] ?? "",
                     crashAge: humanAge(from: crashDate)
                 )
             }
         }
 
         // ---- Recent alerts that fired (last 5)
-        s.alerts = recentAlerts(notifyLog: paths.notifyLog, limit: 5)
+        s.alerts = recentAlerts(notifyLog: paths.notifyLog,
+                                clearedAtFile: paths.alertsClearedAt,
+                                limit: 5)
 
         // ---- Overall status
         // Canary for "ever saved" is presence of any version on disk.
@@ -285,7 +290,7 @@ private func parseKeyValueFile(_ path: String) -> [String: String] {
 /// the top-N most recent saves. Each save row carries TWO timestamps:
 ///   - "saved": mtime of the original .als in the user's project folder
 ///              (so they can see when they last hit save in Ableton).
-///   - "backed up": mtime of the snapshot we wrote (when ATM captured it).
+///   - "backed up": mtime of the snapshot we wrote (when Ableton Lives captured it).
 /// Looks the original up under the configured internal path AND optional
 /// external drive path - whichever exists wins.
 private struct VersionsWalk {
@@ -374,9 +379,19 @@ private func walkVersions(under root: String,
     return w
 }
 
-private func recentAlerts(notifyLog: String, limit: Int) -> [AlertEntry] {
+private func recentAlerts(notifyLog: String,
+                          clearedAtFile: String,
+                          limit: Int) -> [AlertEntry] {
     guard let raw = try? String(contentsOfFile: notifyLog, encoding: .utf8)
     else { return [] }
+    // "Cleared" cutoff: alerts whose ISO timestamp is <= the cutoff are
+    // hidden. String comparison works because the schema is fixed-width
+    // ISO-8601 ("2026-05-18T15:16:14"). Missing file = no cutoff = show all.
+    let cutoff: String = {
+        guard let raw = try? String(contentsOfFile: clearedAtFile,
+                                    encoding: .utf8) else { return "" }
+        return raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    }()
     var out: [AlertEntry] = []
     let lines = raw.split(separator: "\n", omittingEmptySubsequences: true)
     // Walk from the end so we get the most recent first.
@@ -388,6 +403,7 @@ private func recentAlerts(notifyLog: String, limit: Int) -> [AlertEntry] {
         guard parts.count >= 6 else { continue }
         if parts[3] != "fired" { continue }
         let ts = String(parts[0])
+        if !cutoff.isEmpty && ts <= cutoff { continue }
         let timeLabel: String = {
             // ISO "2026-05-12T10:33:17" -> "10:33"
             if let t = ts.range(of: "T") {
@@ -475,7 +491,7 @@ private func trimZeros(_ value: Double, unit: String) -> String {
 // "jump back to the beginning" UI element, instantly recognisable, no
 // internal strokes that can pixel-snap away at @1x. Reads at menubar
 // scale as "restore from earlier", which is what the app does.
-enum ATMIcon {
+enum LivesIcon {
     static let template: NSImage = {
         let canvas = NSSize(width: 22, height: 16)
         let img = NSImage(size: canvas, flipped: false) { _ in
@@ -513,13 +529,14 @@ enum PanelAction {
     case openVersions
     case openLog
     case openAlerts
+    case clearAlerts
     case revealCrashVersion(path: String)
     case dismissCrashBanner
     case quit
 }
 
 struct StatsView: View {
-    let snapshot: ATMSnapshot
+    let snapshot: LivesSnapshot
     /// When set, replaces the normal status pill text - used to show
     /// "Syncing..." or similar transient state immediately on click so the
     /// panel reacts even though the underlying job is still in flight.
@@ -589,7 +606,7 @@ struct StatsView: View {
     @ViewBuilder
     private var header: some View {
         HStack(spacing: 8) {
-            Image(nsImage: ATMIcon.template)
+            Image(nsImage: LivesIcon.template)
                 .renderingMode(.template)
                 .foregroundStyle(Palette.accent)
                 .frame(width: 22, height: 16)
@@ -738,7 +755,7 @@ struct StatsView: View {
     // ---- Recent saves
     // Each row shows: filename · last-saved-in-Ableton · last-backed-up
     // The two times answer "is my last work backed up?" - if backed-up
-    // is roughly the same as saved, ATM is current. If backed-up is
+    // is roughly the same as saved, Ableton Lives is current. If backed-up is
     // older, the watcher missed something.
     @ViewBuilder
     private var recentSavesSection: some View {
@@ -815,6 +832,14 @@ struct StatsView: View {
                     .foregroundStyle(Palette.textDim)
                     .textCase(.uppercase)
                 Spacer()
+                Button(action: { onAction(.clearAlerts) }) {
+                    Text("clear")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Palette.textFaint)
+                        .underline()
+                }
+                .buttonStyle(.plain)
+                .help("Hide every alert at or before now. Audit log is preserved; new alerts after this moment still appear.")
                 Button(action: { onAction(.openAlerts) }) {
                     Text("history")
                         .font(.system(size: 10))
@@ -912,7 +937,7 @@ final class PanelController: NSObject {
     private var panel: NSPanel?
     private var eventMonitor: Any?
     private var statusButtonClickMonitor: Any?
-    private let paths = ATMPaths.resolve()
+    private let paths = LivesPaths.resolve()
 
     /// Set when Sync now is clicked. While set, status pill shows live
     /// progress (% if rclone reports it, else elapsed seconds).
@@ -965,11 +990,11 @@ final class PanelController: NSObject {
         return nil
     }
 
-    // Tiny stderr logger - lands in ableton-time-machine.log via the
+    // Tiny stderr logger - lands in ableton-lives.log via the
     // LaunchAgent's StandardErrorPath. Useful when something silently
     // fails (e.g., panel opening off-screen, hosting controller crash).
     private func logf(_ msg: String) {
-        FileHandle.standardError.write(Data("[atm-menubar] \(msg)\n".utf8))
+        FileHandle.standardError.write(Data("[ableton-lives-menubar] \(msg)\n".utf8))
     }
 
     override init() {
@@ -982,7 +1007,7 @@ final class PanelController: NSObject {
         let item = NSStatusBar.system.statusItem(
             withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            button.image = ATMIcon.template
+            button.image = LivesIcon.template
             button.imagePosition = .imageOnly
             button.target = self
             button.action = #selector(togglePanel(_:))
@@ -1030,7 +1055,7 @@ final class PanelController: NSObject {
     }
 
     private func openPanel() {
-        let snapshot = ATMSnapshot.read(paths: paths)
+        let snapshot = LivesSnapshot.read(paths: paths)
         let view = StatsView(snapshot: snapshot,
                              transientStatus: currentTransientStatus()) { [weak self] action in
             self?.handle(action)
@@ -1142,7 +1167,7 @@ final class PanelController: NSObject {
             // gone we clear the transient state and refresh once more so
             // the real "Last sync" row reflects the result.
             syncTriggeredAt = Date()
-            runShell(paths.home + "/bin/atm-sync.sh")
+            runShell(paths.home + "/bin/lives-sync.sh")
             refreshPanel()
             scheduleSyncStatusPoll()
         case .openVersions:
@@ -1151,6 +1176,16 @@ final class PanelController: NSObject {
             NSWorkspace.shared.open(URL(fileURLWithPath: paths.log))
         case .openAlerts:
             NSWorkspace.shared.open(URL(fileURLWithPath: paths.notifyLog))
+        case .clearAlerts:
+            // Write current ISO timestamp; recentAlerts() filters anything
+            // at-or-before this. Audit log is left intact for forensics.
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            df.timeZone = TimeZone.current
+            let stamp = df.string(from: Date())
+            try? stamp.write(toFile: paths.alertsClearedAt,
+                             atomically: true, encoding: .utf8)
+            refreshPanel()
         case .revealCrashVersion(let path):
             NSWorkspace.shared.selectFile(
                 path, inFileViewerRootedAtPath: "")
@@ -1164,13 +1199,13 @@ final class PanelController: NSObject {
     }
 
     /// Poll the sync state every second. The lockfile-only check from the
-    /// previous version was unreliable because atm-sync.sh's EXIT trap
+    /// previous version was unreliable because lives-sync.sh's EXIT trap
     /// occasionally fails to fire (e.g., process killed mid-run), leaving
     /// a stale lockfile pointing at a dead PID. We now treat sync as
     /// "still running" only if BOTH the lockfile exists AND its PID is
     /// alive. Stale locks are cleaned up so the next click works.
     private func scheduleSyncStatusPoll() {
-        let lockPath = "/tmp/atm-sync.lock"
+        let lockPath = "/tmp/ableton-lives-sync.lock"
         let started = syncTriggeredAt ?? Date()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             guard let self = self else { return }
@@ -1212,7 +1247,7 @@ final class PanelController: NSObject {
     /// Re-read state and rebuild the panel content in place.
     private func refreshPanel() {
         guard let p = panel else { return }
-        let snapshot = ATMSnapshot.read(paths: paths)
+        let snapshot = LivesSnapshot.read(paths: paths)
         let view = StatsView(snapshot: snapshot,
                              transientStatus: currentTransientStatus()) { [weak self] action in
             self?.handle(action)
@@ -1265,7 +1300,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var controller: PanelController?
     func applicationDidFinishLaunching(_ notification: Notification) {
         FileHandle.standardError.write(
-            Data("[atm-menubar] applicationDidFinishLaunching\n".utf8))
+            Data("[ableton-lives-menubar] applicationDidFinishLaunching\n".utf8))
         controller = PanelController()
     }
     func applicationShouldTerminateAfterLastWindowClosed(

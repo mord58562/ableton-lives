@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# atm-prune.sh - Ableton Time Machine retention pruner
+# lives-prune.sh - Ableton Lives retention pruner
 #
 # Tiered retention (rationalised to keep cloud + local footprint <5GB even
 # under heavy multi-project use):
@@ -9,7 +9,7 @@
 #   Zone 3 - 180 d to 365 d          : keep latest per WEEK per .als name
 #   Zone 4 - mtime > 365 d           : DELETE
 #
-# Runs daily at 04:00 via launchd. Logs every deletion to the ATM log.
+# Runs daily at 04:00 via launchd. Logs every deletion to the Ableton Lives log.
 # Notification policy is deliberately quiet - see end of file.
 #
 # VERSIONS_DIR and LOG can be overridden via environment variables for testing.
@@ -19,13 +19,13 @@
 
 set -euo pipefail
 
-ATM_LIB_DIR="${ATM_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
-source "${ATM_LIB_DIR}/atm-config.sh"
-source "${ATM_LIB_DIR}/atm-notify.sh"
+LIVES_LIB_DIR="${LIVES_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
+source "${LIVES_LIB_DIR}/lives-config.sh"
+source "${LIVES_LIB_DIR}/lives-notify.sh"
 
-VERSIONS_DIR="${ATM_VERSIONS_DIR}"
-LOG="${ATM_LOG}"
-SUMMARY="${ATM_SUMMARY}"
+VERSIONS_DIR="${LIVES_VERSIONS_DIR}"
+LOG="${LIVES_LOG}"
+SUMMARY="${LIVES_SUMMARY}"
 
 log() {
     printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >> "${LOG}" 2>/dev/null || true
@@ -59,8 +59,8 @@ threshold_365d=$(( 365 * 86400 ))
 prune_zone_keep_max_per_bucket() {
     local label="$1"
     local bucket_kind="$2"
-    local tmp_in="${VERSIONS_DIR}/.atm-prune-${label}.$$"
-    local tmp_winners="${VERSIONS_DIR}/.atm-prune-${label}-win.$$"
+    local tmp_in="${VERSIONS_DIR}/.ableton-lives-prune-${label}.$$"
+    local tmp_winners="${VERSIONS_DIR}/.ableton-lives-prune-${label}-win.$$"
     : > "${tmp_in}"
 
     while IFS= read -r f; do
@@ -144,7 +144,7 @@ for project_dir in "${project_dirs[@]}"; do
     all_files=()
     while IFS= read -r f; do
         all_files+=("${f}")
-    done < <(find "${project_dir}" -name '*.als' -maxdepth 1 2>/dev/null | sort)
+    done < <(find "${project_dir}" -name '*.als' -not -name '._*' -maxdepth 1 2>/dev/null | sort)
 
     if [[ ${#all_files[@]} -eq 0 ]]; then
         continue
@@ -190,9 +190,9 @@ done
 # Update summary with prune stats
 if [[ -f "${SUMMARY}" ]]; then
     tmp_sum="${SUMMARY}.prune.tmp.$$"
-    grep -v '^ATM_PRUNE_' "${SUMMARY}" > "${tmp_sum}" 2>/dev/null || true
-    printf 'ATM_PRUNE_LAST_RUN=%s\n' "${now_iso}" >> "${tmp_sum}"
-    printf 'ATM_PRUNE_DELETED_LAST_RUN=%d\n' "${deleted_count}" >> "${tmp_sum}"
+    grep -v '^LIVES_PRUNE_' "${SUMMARY}" > "${tmp_sum}" 2>/dev/null || true
+    printf 'LIVES_PRUNE_LAST_RUN=%s\n' "${now_iso}" >> "${tmp_sum}"
+    printf 'LIVES_PRUNE_DELETED_LAST_RUN=%d\n' "${deleted_count}" >> "${tmp_sum}"
     mv "${tmp_sum}" "${SUMMARY}"
 fi
 
@@ -202,17 +202,17 @@ log "[PRUNE] done - deleted ${deleted_count} file(s)"
 #   - Silent on every routine prune, even when files were deleted.
 #     Routine pruning is expected; daily popups become wallpaper noise.
 #   - Notify only on UNUSUAL events:
-#       * deleted_count >= ATM_PRUNE_NOTIFY_THRESHOLD (default 25)
+#       * deleted_count >= LIVES_PRUNE_NOTIFY_THRESHOLD (default 25)
 #         A large sweep is worth a heads-up in case it was unintended.
 #       * weekly digest on Sundays summarising the week's deletions
 #         (read from summary file; cheap and once-per-week).
-ATM_PRUNE_NOTIFY_THRESHOLD="${ATM_PRUNE_NOTIFY_THRESHOLD:-25}"
+LIVES_PRUNE_NOTIFY_THRESHOLD="${LIVES_PRUNE_NOTIFY_THRESHOLD:-25}"
 
-if [[ "${deleted_count}" -ge "${ATM_PRUNE_NOTIFY_THRESHOLD}" ]]; then
-    atm_notify_event "prune.large" "warn" "ATM pruner: large sweep" \
+if [[ "${deleted_count}" -ge "${LIVES_PRUNE_NOTIFY_THRESHOLD}" ]]; then
+    lives_notify_event "prune.large" "warn" "Ableton Lives pruner: large sweep" \
         "${deleted_count} versions removed today. Open the log if this looks wrong."
 elif [[ "$(date '+%u')" = "7" ]] && [[ "${deleted_count}" -gt 0 ]]; then
-    atm_notify_event "prune.weekly" "info" "ATM pruner: weekly digest" \
+    lives_notify_event "prune.weekly" "info" "Ableton Lives pruner: weekly digest" \
         "${deleted_count} version(s) pruned today."
 fi
 

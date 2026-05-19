@@ -1,18 +1,18 @@
 #!/usr/bin/env zsh
-# atm-preview.sh - extract metadata from a versioned .als
+# lives-preview.sh - extract metadata from a versioned .als
 #
 # Ableton .als files are gzip-compressed XML. This pulls a few high-signal
 # fields so the restore picker can show "120 BPM · 8 tracks" alongside
 # each timestamp instead of bare numbers.
 #
 # Usage:
-#   atm-preview.sh <project> <timestamp>
+#   lives-preview.sh <project> <timestamp>
 #       Prints one line: BPM=120 TRACKS=8 LIVE=12.0.5 SIZE=4.2M
 #
-#   atm-preview.sh --file <path-to-als>
+#   lives-preview.sh --file <path-to-als>
 #       Same but for any .als file directly.
 #
-#   atm-preview.sh --label <project> <timestamp>
+#   lives-preview.sh --label <project> <timestamp>
 #       Prints a human-readable label ready for AppleScript:
 #       "20260512-093045  ·  120 BPM  ·  8 tracks  ·  4.2M"
 #
@@ -22,9 +22,9 @@
 
 set -euo pipefail
 
-ATM_LIB_DIR="${ATM_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
-source "${ATM_LIB_DIR}/atm-config.sh"
-VERSIONS_DIR="${ATM_VERSIONS_DIR}"
+LIVES_LIB_DIR="${LIVES_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
+source "${LIVES_LIB_DIR}/lives-config.sh"
+VERSIONS_DIR="${LIVES_VERSIONS_DIR}"
 
 extract_meta() {
     local als="$1"
@@ -99,11 +99,11 @@ resolve_als() {
 mode="${1:-}"
 case "${mode}" in
     --file)
-        [[ $# -ne 2 ]] && { printf 'Usage: atm-preview.sh --file <path>\n' >&2; exit 1; }
+        [[ $# -ne 2 ]] && { printf 'Usage: lives-preview.sh --file <path>\n' >&2; exit 1; }
         cache_get_or_compute "$2"
         ;;
     --label)
-        [[ $# -ne 3 ]] && { printf 'Usage: atm-preview.sh --label <project> <ts>\n' >&2; exit 1; }
+        [[ $# -ne 3 ]] && { printf 'Usage: lives-preview.sh --label <project> <ts>\n' >&2; exit 1; }
         als=$(resolve_als "$2" "$3")
         [[ -z "${als}" ]] && { printf '%s  ·  (missing)\n' "$3"; exit 0; }
         meta=$(cache_get_or_compute "${als}")
@@ -114,11 +114,11 @@ case "${mode}" in
         printf '%s  ·  %s BPM  ·  %s tracks  ·  %s\n' "$3" "${bpm}" "${tracks}" "${size}"
         ;;
     "")
-        printf 'Usage: atm-preview.sh <project> <ts> | --file <path> | --label <project> <ts>\n' >&2
+        printf 'Usage: lives-preview.sh <project> <ts> | --file <path> | --label <project> <ts>\n' >&2
         exit 1
         ;;
     *)
-        [[ $# -ne 2 ]] && { printf 'Usage: atm-preview.sh <project> <ts>\n' >&2; exit 1; }
+        [[ $# -ne 2 ]] && { printf 'Usage: lives-preview.sh <project> <ts>\n' >&2; exit 1; }
         als=$(resolve_als "$1" "$2")
         [[ -z "${als}" ]] && { printf 'No version: %s @ %s\n' "$1" "$2" >&2; exit 1; }
         cache_get_or_compute "${als}"

@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.atm.menubar</string>
+    <string>com.mord58562.ableton-lives.menubar</string>
 
     <!-- Launch the .app's binary directly. This bypasses LaunchServices
          and gives launchd a real PID to track for KeepAlive. -->
     <key>ProgramArguments</key>
     <array>
-        <string>{{ATM_HOME}}/swift/ATMMenuBar.app/Contents/MacOS/atm-menubar</string>
+        <string>{{LIVES_HOME}}/swift/AbletonLives.app/Contents/MacOS/ableton-lives-menubar</string>
     </array>
 
     <!-- Start at login. -->
@@ -24,8 +24,8 @@
     </dict>
 
     <key>StandardOutPath</key>
-    <string>{{ATM_LOG}}</string>
+    <string>{{LIVES_LOG}}</string>
     <key>StandardErrorPath</key>
-    <string>{{ATM_LOG}}</string>
+    <string>{{LIVES_LOG}}</string>
 </dict>
 </plist>

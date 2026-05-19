@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# atm-watch.sh - Ableton Time Machine watcher
+# lives-watch.sh - Ableton Lives watcher
 # Invoked by launchd WatchPaths. Scans for recently-modified .als files,
 # deduplicates by SHA-256, copies versioned snapshots to _versions/.
 # Short-lived: runs once, copies, exits. KeepAlive in the plist re-arms it.
@@ -13,26 +13,26 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Configuration (loaded from ~/.config/atm/config; env vars take precedence)
+# Configuration (loaded from ~/.config/ableton-lives/config; env vars take precedence)
 # ---------------------------------------------------------------------------
-ATM_LIB_DIR="${ATM_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
-source "${ATM_LIB_DIR}/atm-config.sh"
+LIVES_LIB_DIR="${LIVES_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
+source "${LIVES_LIB_DIR}/lives-config.sh"
 
-VERSIONS_DIR="${ATM_VERSIONS_DIR}"
-LOG="${ATM_LOG}"
-SEEN_HASHES="${ATM_SEEN_HASHES}"
-SUMMARY="${ATM_SUMMARY}"
+VERSIONS_DIR="${LIVES_VERSIONS_DIR}"
+LOG="${LIVES_LOG}"
+SEEN_HASHES="${LIVES_SEEN_HASHES}"
+SUMMARY="${LIVES_SUMMARY}"
 # USB_PATH may be empty (no external drive watched); script handles that.
-USB_PATH="${ATM_USB_PATH}"
-INTERNAL_PATH="${ATM_INTERNAL_PATH}"
-LOCKFILE="${ATM_LOCKFILE:-/tmp/atm-watch.lock}"
-MTIME_WINDOW="${ATM_MTIME_WINDOW:-30}"  # seconds
+USB_PATH="${LIVES_USB_PATH}"
+INTERNAL_PATH="${LIVES_INTERNAL_PATH}"
+LOCKFILE="${LIVES_LOCKFILE:-/tmp/ableton-lives-watch.lock}"
+MTIME_WINDOW="${LIVES_MTIME_WINDOW:-30}"  # seconds
 
 # Audio export capture: any audio file appearing in a project, but NOT in
 # Samples/, Backup/, or _versions/, is treated as a finished render and
 # mirrored into _versions/<project>/_exports/. Live Recordings/ counts as
 # a project named "Live Recordings" so takes are preserved too.
-EXPORT_EXTS="${ATM_EXPORT_EXTS:-wav aiff aif flac mp3 m4a ogg}"
+EXPORT_EXTS="${LIVES_EXPORT_EXTS:-wav aiff aif flac mp3 m4a ogg}"
 
 # ---------------------------------------------------------------------------
 # Logging helper
@@ -66,7 +66,7 @@ mkdir -p "${VERSIONS_DIR}"
 mkdir -p "$(dirname "${LOG}")"
 touch "${LOG}"
 
-log "[START] atm-watch invoked"
+log "[START] lives-watch invoked"
 
 # ---------------------------------------------------------------------------
 # Step 3: Prune stale seen-hashes entries (keep only today's)
@@ -96,7 +96,7 @@ fi
 # IMPORTANT: Do NOT name the local variable 'path' in any function - in zsh,
 # 'path' is tied to PATH and 'local path=...' would zero out PATH, breaking
 # command lookups (date, shasum, etc.).
-ref_file="/tmp/atm-mtime-ref.$$"
+ref_file="/tmp/lives-mtime-ref.$$"
 touch -m -t "$(date -v-${MTIME_WINDOW}S '+%Y%m%d%H%M.%S')" "${ref_file}" 2>/dev/null || true
 
 candidates=()
@@ -110,7 +110,7 @@ scan_path_mtime() {
     fi
     while IFS= read -r -d '' f; do
         candidates+=("${f}")
-    done < <(find "${scan_dir}" -name '*.als' -newer "${ref_file}" -not -path '*/_versions/*' -print0 2>/dev/null || true)
+    done < <(find "${scan_dir}" -name '*.als' -not -name '._*' -newer "${ref_file}" -not -path '*/_versions/*' -print0 2>/dev/null || true)
 }
 
 [[ -n "${USB_PATH}" ]] && scan_path_mtime "${USB_PATH}" "external"
@@ -276,7 +276,7 @@ for f in "${export_candidates[@]}"; do
 done
 
 # ---------------------------------------------------------------------------
-# Step 6: Update .atm-summary atomically
+# Step 6: Update .ableton-lives-summary atomically
 # ---------------------------------------------------------------------------
 update_summary() {
     local summary_dir
@@ -284,7 +284,7 @@ update_summary() {
     mkdir -p "${summary_dir}"
 
     local total_count
-    total_count=$(find "${VERSIONS_DIR}" -name '*.als' 2>/dev/null | wc -l | tr -d ' ')
+    total_count=$(find "${VERSIONS_DIR}" -name '*.als' -not -name '._*' 2>/dev/null | wc -l | tr -d ' ')
 
     local total_bytes
     total_bytes=$(du -sb "${VERSIONS_DIR}" 2>/dev/null | awk '{print $1}' || \
@@ -300,7 +300,7 @@ update_summary() {
     # Read existing recent saves
     local existing_recent=""
     if [[ -f "${SUMMARY}" ]]; then
-        existing_recent=$(grep '^ATM_RECENT_SAVES=' "${SUMMARY}" 2>/dev/null | cut -d= -f2- || true)
+        existing_recent=$(grep '^LIVES_RECENT_SAVES=' "${SUMMARY}" 2>/dev/null | cut -d= -f2- || true)
     fi
 
     # Merge and keep only 2 most recent
@@ -318,18 +318,18 @@ update_summary() {
     local prune_last=""
     local prune_deleted=""
     if [[ -f "${SUMMARY}" ]]; then
-        prune_last=$(grep '^ATM_PRUNE_LAST_RUN=' "${SUMMARY}" 2>/dev/null | cut -d= -f2- || true)
-        prune_deleted=$(grep '^ATM_PRUNE_DELETED_LAST_RUN=' "${SUMMARY}" 2>/dev/null | cut -d= -f2- || true)
+        prune_last=$(grep '^LIVES_PRUNE_LAST_RUN=' "${SUMMARY}" 2>/dev/null | cut -d= -f2- || true)
+        prune_deleted=$(grep '^LIVES_PRUNE_DELETED_LAST_RUN=' "${SUMMARY}" 2>/dev/null | cut -d= -f2- || true)
     fi
 
     local tmp_summary="${SUMMARY}.tmp.$$"
     cat > "${tmp_summary}" <<EOF
-ATM_LAST_UPDATED=${now_iso}
-ATM_VERSION_COUNT_TOTAL=${total_count}
-ATM_STORAGE_BYTES=${total_bytes}
-ATM_RECENT_SAVES=${merged_saves}
-ATM_PRUNE_LAST_RUN=${prune_last}
-ATM_PRUNE_DELETED_LAST_RUN=${prune_deleted}
+LIVES_LAST_UPDATED=${now_iso}
+LIVES_VERSION_COUNT_TOTAL=${total_count}
+LIVES_STORAGE_BYTES=${total_bytes}
+LIVES_RECENT_SAVES=${merged_saves}
+LIVES_PRUNE_LAST_RUN=${prune_last}
+LIVES_PRUNE_DELETED_LAST_RUN=${prune_deleted}
 EOF
     mv "${tmp_summary}" "${SUMMARY}"
 }

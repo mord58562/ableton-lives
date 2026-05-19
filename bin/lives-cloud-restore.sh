@@ -1,26 +1,26 @@
 #!/usr/bin/env zsh
-# atm-cloud-restore.sh - pull the encrypted backup from Google Drive.
+# lives-cloud-restore.sh - pull the encrypted backup from Google Drive.
 #
 # Use this when the local _versions/ store is gone (disk failure, fresh
 # machine, accidentally deleted). Requires that the rclone crypt remote
 # is configured with the SAME passwords as the original sync.
 #
 # Usage:
-#   atm-cloud-restore.sh                      Full restore -> ~/Music/Ableton/_versions/
-#   atm-cloud-restore.sh --to <path>          Alternate destination
-#   atm-cloud-restore.sh --project <name>     One project only
-#   atm-cloud-restore.sh --dry-run            Show what would happen
-#   atm-cloud-restore.sh --resume             Skip files that already exist locally
+#   lives-cloud-restore.sh                      Full restore -> ~/Music/Ableton/_versions/
+#   lives-cloud-restore.sh --to <path>          Alternate destination
+#   lives-cloud-restore.sh --project <name>     One project only
+#   lives-cloud-restore.sh --dry-run            Show what would happen
+#   lives-cloud-restore.sh --resume             Skip files that already exist locally
 
 set -euo pipefail
 
-ATM_LIB_DIR="${ATM_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
-source "${ATM_LIB_DIR}/atm-config.sh"
-VERSIONS_DIR="${ATM_VERSIONS_DIR}"
-LOG="${ATM_LOG}"
-SYNC_REMOTE="${ATM_SYNC_REMOTE}"
-SYNC_PATH="${ATM_SYNC_PATH}"
-RCLONE="${ATM_RCLONE:-rclone}"
+LIVES_LIB_DIR="${LIVES_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
+source "${LIVES_LIB_DIR}/lives-config.sh"
+VERSIONS_DIR="${LIVES_VERSIONS_DIR}"
+LOG="${LIVES_LOG}"
+SYNC_REMOTE="${LIVES_SYNC_REMOTE}"
+SYNC_PATH="${LIVES_SYNC_PATH}"
+RCLONE="${LIVES_RCLONE:-rclone}"
 
 dest="${VERSIONS_DIR}"
 project=""
@@ -50,7 +50,7 @@ if ! command -v "${RCLONE}" >/dev/null 2>&1; then
 fi
 
 if ! "${RCLONE}" listremotes 2>/dev/null | grep -qx "${SYNC_REMOTE}:"; then
-    printf 'Crypt remote "%s:" not configured. Run atm-sync-setup.sh.\n' "${SYNC_REMOTE}" >&2
+    printf 'Crypt remote "%s:" not configured. Run lives-sync-setup.sh.\n' "${SYNC_REMOTE}" >&2
     printf 'You will need the SAME passwords as the original backup.\n' >&2
     exit 1
 fi
@@ -100,7 +100,7 @@ if "${RCLONE}" copy "${src}" "${dest}" "${flags[@]}"; then
     printf '  Files restored to: %s\n' "${dest}"
     printf '\nNext steps:\n'
     printf '  1. Verify with: ls "%s"\n' "${dest}"
-    printf '  2. To resume normal sync: ensure atm-sync.sh runs nightly.\n'
+    printf '  2. To resume normal sync: ensure lives-sync.sh runs nightly.\n'
 else
     printf '\nRestore FAILED. Partial download may be in: %s\n' "${dest}" >&2
     printf 'Re-run with --resume to continue.\n' >&2

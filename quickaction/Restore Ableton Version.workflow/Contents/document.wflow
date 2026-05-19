@@ -58,7 +58,7 @@
                 <key>ActionParameters</key>
                 <dict>
                     <key>COMMAND_STRING</key>
-                    <string>-- Ableton Time Machine: Restore Ableton Version
+                    <string>-- Ableton Lives: Restore Ableton Version
 -- Quick Action: right-click a .als file in Finder to invoke.
 -- DESIGN.md Section 4: AppleScript pseudo-flow.
 
@@ -75,7 +75,7 @@ on run {input, parameters}
     set project_name to do shell script "basename $(dirname " &amp; quoted form of als_path &amp; ")"
 
     -- Get sorted version list (newest first)
-    set restore_bin to (do shell script "echo $HOME") &amp; "/Downloads/ableton-time-machine/bin/atm-restore.sh"
+    set restore_bin to (do shell script "echo $HOME") &amp; "/Downloads/ableton-lives/bin/lives-restore.sh"
     -- Enriched listing: each line is "TIMESTAMP  ·  BPM  ·  TRACKS  ·  SIZE"
     set version_output to do shell script quoted form of restore_bin &amp; " --list-meta " &amp; quoted form of project_name
     if version_output is "" then
@@ -111,7 +111,7 @@ on run {input, parameters}
         "Restore " &amp; chosen_version &amp; " over:" &amp; return &amp; als_path &amp; return &amp; return &amp; ¬
         "A .bak copy of the current file will be saved first." ¬
         buttons {"Cancel", "Restore"} default button "Restore" ¬
-        with title "Ableton Time Machine")
+        with title "Ableton Lives")
 
     if confirm_result is "Cancel" then return
 
@@ -124,7 +124,7 @@ on run {input, parameters}
         &amp; quoted form of chosen_ts &amp; " " ¬
         &amp; quoted form of als_path
 
-    display notification "Restored " &amp; chosen_version with title "Ableton Time Machine"
+    display notification "Restored " &amp; chosen_version with title "Ableton Lives"
 end run</string>
                     <key>inputMethod</key>
                     <integer>1</integer>

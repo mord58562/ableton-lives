@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.atm.menubar</string>
+    <string>com.mord58562.ableton-lives.menubar</string>
     <key>CFBundleName</key>
     <string>Ableton Lives</string>
     <key>CFBundleDisplayName</key>
     <string>Ableton Lives</string>
     <key>CFBundleExecutable</key>
-    <string>atm-menubar</string>
+    <string>ableton-lives-menubar</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleVersion</key>

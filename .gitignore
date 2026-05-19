@@ -10,14 +10,14 @@ presets/local.preset.stash
 RECON.md
 
 # Built Swift menubar app — compiled artefact, rebuilt by swift/build.sh.
-swift/ATMMenuBar.app/
+swift/AbletonLives.app/
 
 # Release tarballs.
 dist/
 
 # Logs and ephemeral state (created by the running agents, never source).
 *.log
-.atm-*
+.ableton-lives-*
 
 # Editor cruft
 *.swp

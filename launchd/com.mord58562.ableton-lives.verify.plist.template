@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.atm.verify</string>
+    <string>com.mord58562.ableton-lives.verify</string>
     <key>ProgramArguments</key>
     <array>
         <string>/bin/zsh</string>
-        <string>{{ATM_HOME}}/bin/atm-verify.sh</string>
+        <string>{{LIVES_HOME}}/bin/lives-verify.sh</string>
     </array>
     <key>StartCalendarInterval</key>
     <dict>
@@ -16,8 +16,8 @@
         <key>Minute</key><integer>15</integer>
     </dict>
     <key>StandardOutPath</key>
-    <string>{{ATM_LOG}}</string>
+    <string>{{LIVES_LOG}}</string>
     <key>StandardErrorPath</key>
-    <string>{{ATM_LOG}}</string>
+    <string>{{LIVES_LOG}}</string>
 </dict>
 </plist>

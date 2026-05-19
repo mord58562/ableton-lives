@@ -1,9 +1,9 @@
 #!/usr/bin/env zsh
-# atm-sync-setup.sh - one-time interactive setup for encrypted Google Drive sync
+# lives-sync-setup.sh - one-time interactive setup for encrypted Google Drive sync
 #
 # Creates two rclone remotes:
-#   atm-gdrive  - raw Google Drive remote (used ONLY for quota queries)
-#   atm-crypt   - crypt remote wrapping atm-gdrive:atm-encrypted/
+#   lives-gdrive  - raw Google Drive remote (used ONLY for quota queries)
+#   lives-crypt   - crypt remote wrapping lives-gdrive:lives-encrypted/
 #                 (all file content goes here; Google sees only opaque blobs)
 #
 # Run this once. After it succeeds, the launchd sync agent will start syncing
@@ -11,16 +11,16 @@
 
 set -euo pipefail
 
-ATM_LIB_DIR="${ATM_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
-source "${ATM_LIB_DIR}/atm-config.sh"
+LIVES_LIB_DIR="${LIVES_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
+source "${LIVES_LIB_DIR}/lives-config.sh"
 
-RCLONE_BIN="${ATM_RCLONE:-rclone}"
-QUOTA_REMOTE="${ATM_QUOTA_REMOTE}"
-SYNC_REMOTE="${ATM_SYNC_REMOTE}"
+RCLONE_BIN="${LIVES_RCLONE:-rclone}"
+QUOTA_REMOTE="${LIVES_QUOTA_REMOTE}"
+SYNC_REMOTE="${LIVES_SYNC_REMOTE}"
 RCLONE_CONFIG="${HOME}/.config/rclone/rclone.conf"
-ENCRYPT="${ATM_ENCRYPT_BACKUP:-1}"
+ENCRYPT="${LIVES_ENCRYPT_BACKUP:-1}"
 
-printf '\n=== Ableton Time Machine - Sync Setup ===\n\n'
+printf '\n=== Ableton Lives - Sync Setup ===\n\n'
 
 if ! command -v "${RCLONE_BIN}" >/dev/null 2>&1; then
     printf 'rclone is not installed.\n\n'
@@ -39,7 +39,7 @@ if "${RCLONE_BIN}" listremotes 2>/dev/null | grep -qx "${QUOTA_REMOTE}:"; then
     printf '[1/3] Raw Drive remote "%s:" already exists - skipping.\n' "${QUOTA_REMOTE}"
     printf '      To change which Google account this points at:\n'
     printf '        rclone config delete %s\n' "${QUOTA_REMOTE}"
-    printf '        bin/atm-sync-setup.sh   (re-run to recreate)\n\n'
+    printf '        bin/lives-sync-setup.sh   (re-run to recreate)\n\n'
 else
     printf '[1/3] Configuring Google Drive remote "%s:"...\n' "${QUOTA_REMOTE}"
     printf '\n'
@@ -89,7 +89,7 @@ if [[ "${ENCRYPT}" = "1" ]]; then
     if ! "${RCLONE_BIN}" listremotes 2>/dev/null | grep -qx "${SYNC_REMOTE}:"; then
         printf '\n'
         printf '      Creating an encrypted layer that wraps:\n'
-        printf '        %s:atm-encrypted/\n\n' "${QUOTA_REMOTE}"
+        printf '        %s:lives-encrypted/\n\n' "${QUOTA_REMOTE}"
         printf '      Encryption: filename + directory-name + content. Google\n'
         printf '      sees only opaque encrypted blobs.\n\n'
         printf '      Two strong random passwords will be generated below.\n'
@@ -127,7 +127,7 @@ if [[ "${ENCRYPT}" = "1" ]]; then
         OBS2=$("${RCLONE_BIN}" obscure "${PW2}")
 
         "${RCLONE_BIN}" config create "${SYNC_REMOTE}" crypt \
-            remote="${QUOTA_REMOTE}:atm-encrypted" \
+            remote="${QUOTA_REMOTE}:lives-encrypted" \
             filename_encryption=standard \
             directory_name_encryption=true \
             password="${OBS1}" \
@@ -142,9 +142,9 @@ if [[ "${ENCRYPT}" = "1" ]]; then
     fi
 else
     printf '\n[2/3] Unencrypted mode selected - skipping crypt layer.\n'
-    printf '      Files will sync directly to "%s:%s/".\n' "${QUOTA_REMOTE}" "${ATM_SYNC_PATH}"
+    printf '      Files will sync directly to "%s:%s/".\n' "${QUOTA_REMOTE}" "${LIVES_SYNC_PATH}"
     printf '      You can browse them at https://drive.google.com.\n'
-    printf '      To switch to encrypted later: bin/atm-config.sh set ATM_ENCRYPT_BACKUP 1\n'
+    printf '      To switch to encrypted later: bin/lives-config.sh set LIVES_ENCRYPT_BACKUP 1\n'
     printf '      then re-run this setup script.\n'
 fi
 
@@ -152,12 +152,12 @@ fi
 # Step 3: dry-run smoke
 # ---------------------------------------------------------------------------
 printf '\n[3/3] Dry-run sync (no files will be uploaded)...\n'
-VERSIONS_DIR="${ATM_VERSIONS_DIR}"
+VERSIONS_DIR="${LIVES_VERSIONS_DIR}"
 if [[ ! -d "${VERSIONS_DIR}" ]]; then
     printf '      _versions/ does not exist yet - skipping dry-run.\n'
     printf '      Sync will start working as soon as the watcher captures a save.\n'
 else
-    "${RCLONE_BIN}" sync "${VERSIONS_DIR}" "${SYNC_REMOTE}:${ATM_SYNC_PATH}" \
+    "${RCLONE_BIN}" sync "${VERSIONS_DIR}" "${SYNC_REMOTE}:${LIVES_SYNC_PATH}" \
         --dry-run --checksum --max-delete 0 2>&1 | sed 's/^/      /' | head -20
 fi
 
@@ -167,7 +167,7 @@ fi
 # remotes exist. Loading it here means the user gets a working sync the
 # very first nightly cycle after setup, with zero "not configured" pings.
 # ---------------------------------------------------------------------------
-SYNC_PLIST_NAME="com.atm.sync.plist"
+SYNC_PLIST_NAME="com.mord58562.ableton-lives.sync.plist"
 LAUNCH_AGENTS_DIR="${HOME}/Library/LaunchAgents"
 if [[ -f "${LAUNCH_AGENTS_DIR}/${SYNC_PLIST_NAME}" ]]; then
     launchctl unload "${LAUNCH_AGENTS_DIR}/${SYNC_PLIST_NAME}" 2>/dev/null || true
@@ -191,10 +191,10 @@ if [[ "${ENCRYPT}" = "1" ]]; then
     printf '      with the rclone binary - treat the file as secret.)\n'
 else
     printf 'Backup is unencrypted. To switch to encrypted later:\n'
-    printf '  bin/atm-config.sh set ATM_ENCRYPT_BACKUP 1\n'
-    printf '  bin/atm-sync-setup.sh\n'
+    printf '  bin/lives-config.sh set LIVES_ENCRYPT_BACKUP 1\n'
+    printf '  bin/lives-sync-setup.sh\n'
 fi
 printf '\n'
 printf 'The launchd sync agent will run nightly at 04:30. To trigger now:\n'
-printf '  zsh %s/atm-sync.sh\n' "$(cd "$(dirname "$0")" && pwd)"
+printf '  zsh %s/lives-sync.sh\n' "$(cd "$(dirname "$0")" && pwd)"
 printf '\n'

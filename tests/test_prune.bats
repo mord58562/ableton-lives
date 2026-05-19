@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# test_prune.bats - Tests for atm-prune.sh tiered retention policy.
+# test_prune.bats - Tests for lives-prune.sh tiered retention policy.
 #
 # Zones:
 #   Zone 0  < 24h         keep all
@@ -9,18 +9,18 @@
 #   Zone 4  > 365d        delete
 
 FIXTURE="$(cd "$(dirname "${BATS_TEST_FILENAME}")" && pwd)/fixtures/fake.als"
-PRUNE_SCRIPT="$(cd "$(dirname "${BATS_TEST_FILENAME}")/.." && pwd)/bin/atm-prune.sh"
+PRUNE_SCRIPT="$(cd "$(dirname "${BATS_TEST_FILENAME}")/.." && pwd)/bin/lives-prune.sh"
 
 setup() {
-    TEST_DIR="$(mktemp -d /tmp/atm-test-prune.XXXXXX)"
+    TEST_DIR="$(mktemp -d /tmp/lives-test-prune.XXXXXX)"
     export TEST_DIR
-    export ATM_CONFIG=/dev/null
-    export ATM_VERSIONS_DIR="${TEST_DIR}/_versions"
-    export ATM_LOG="${TEST_DIR}/atm.log"
-    export ATM_SUMMARY="${TEST_DIR}/.atm-summary"
+    export LIVES_CONFIG=/dev/null
+    export LIVES_VERSIONS_DIR="${TEST_DIR}/_versions"
+    export LIVES_LOG="${TEST_DIR}/atm.log"
+    export LIVES_SUMMARY="${TEST_DIR}/.ableton-lives-summary"
     # Suppress real macOS notifications during tests
-    export ATM_NO_NOTIFY=1
-    mkdir -p "${ATM_VERSIONS_DIR}/myproject"
+    export LIVES_NO_NOTIFY=1
+    mkdir -p "${LIVES_VERSIONS_DIR}/myproject"
 }
 
 teardown() {
@@ -34,7 +34,7 @@ make_version() {
     local date_str
     date_str=$(date -v-${days_ago}d '+%Y%m%d' 2>/dev/null || date -d "-${days_ago} days" '+%Y%m%d')
     local ts="${date_str}-${hh}${mm}00"
-    local f="${ATM_VERSIONS_DIR}/myproject/${name}-${ts}.als"
+    local f="${LIVES_VERSIONS_DIR}/myproject/${name}-${ts}.als"
     cp "${FIXTURE}" "${f}"
     touch -m -t "${date_str}${hh}${mm}.00" "${f}" 2>/dev/null \
         || touch -m -t "$(date -v-${days_ago}d "+%Y%m%d${hh}${mm}.00" 2>/dev/null)" "${f}" 2>/dev/null \
@@ -52,7 +52,7 @@ make_version() {
     run zsh "${PRUNE_SCRIPT}"
     [ "${status}" -eq 0 ]
     local after
-    after=$(find "${ATM_VERSIONS_DIR}" -name 'fresh_track-*.als' | wc -l | tr -d ' ')
+    after=$(find "${LIVES_VERSIONS_DIR}" -name 'fresh_track-*.als' | wc -l | tr -d ' ')
     [ "${after}" -eq 4 ]
 }
 
@@ -64,7 +64,7 @@ make_version() {
     run zsh "${PRUNE_SCRIPT}"
     [ "${status}" -eq 0 ]
     local after
-    after=$(find "${ATM_VERSIONS_DIR}" -name 'burst_track-*.als' | wc -l | tr -d ' ')
+    after=$(find "${LIVES_VERSIONS_DIR}" -name 'burst_track-*.als' | wc -l | tr -d ' ')
     [ "${after}" -eq 1 ]
 }
 
@@ -76,7 +76,7 @@ make_version() {
     run zsh "${PRUNE_SCRIPT}"
     [ "${status}" -eq 0 ]
     local after
-    after=$(find "${ATM_VERSIONS_DIR}" -name 'spread_track-*.als' | wc -l | tr -d ' ')
+    after=$(find "${LIVES_VERSIONS_DIR}" -name 'spread_track-*.als' | wc -l | tr -d ' ')
     [ "${after}" -eq 5 ]
 }
 
@@ -90,7 +90,7 @@ make_version() {
     run zsh "${PRUNE_SCRIPT}"
     [ "${status}" -eq 0 ]
     local after
-    after=$(find "${ATM_VERSIONS_DIR}" -name 'chord_prog-*.als' | wc -l | tr -d ' ')
+    after=$(find "${LIVES_VERSIONS_DIR}" -name 'chord_prog-*.als' | wc -l | tr -d ' ')
     [ "${after}" -eq 3 ]
 }
 
@@ -104,7 +104,7 @@ make_version() {
     run zsh "${PRUNE_SCRIPT}"
     [ "${status}" -eq 0 ]
     local after
-    after=$(find "${ATM_VERSIONS_DIR}" -name 'old_track-*.als' | wc -l | tr -d ' ')
+    after=$(find "${LIVES_VERSIONS_DIR}" -name 'old_track-*.als' | wc -l | tr -d ' ')
     [ "${after}" -eq 1 ]
 }
 
@@ -118,7 +118,7 @@ make_version() {
     run zsh "${PRUNE_SCRIPT}"
     [ "${status}" -eq 0 ]
     local after
-    after=$(find "${ATM_VERSIONS_DIR}" -name 'weekly_track-*.als' | wc -l | tr -d ' ')
+    after=$(find "${LIVES_VERSIONS_DIR}" -name 'weekly_track-*.als' | wc -l | tr -d ' ')
     [ "${after}" -ge 2 ] && [ "${after}" -le 3 ]
 }
 
@@ -130,7 +130,7 @@ make_version() {
     run zsh "${PRUNE_SCRIPT}"
     [ "${status}" -eq 0 ]
     local after
-    after=$(find "${ATM_VERSIONS_DIR}" -name 'ancient_track-*.als' | wc -l | tr -d ' ')
+    after=$(find "${LIVES_VERSIONS_DIR}" -name 'ancient_track-*.als' | wc -l | tr -d ' ')
     [ "${after}" -eq 0 ]
 }
 
@@ -143,11 +143,11 @@ make_version() {
     run zsh "${PRUNE_SCRIPT}"
     [ "${status}" -eq 0 ]
 
-    run grep "logged_track" "${ATM_LOG}"
+    run grep "logged_track" "${LIVES_LOG}"
     [ "${status}" -eq 0 ]
 
     local delete_count
-    delete_count=$(grep -c "\[DELETE\]" "${ATM_LOG}" || echo 0)
+    delete_count=$(grep -c "\[DELETE\]" "${LIVES_LOG}" || echo 0)
     [ "${delete_count}" -ge 2 ]
 }
 
@@ -172,7 +172,7 @@ make_version() {
     [ "${status}" -eq 0 ]
 
     local after
-    after=$(find "${ATM_VERSIONS_DIR}" -name 'mix-*.als' | wc -l | tr -d ' ')
+    after=$(find "${LIVES_VERSIONS_DIR}" -name 'mix-*.als' | wc -l | tr -d ' ')
     # 2 (zone0) + 1 (zone1) + 1 (zone2) + 1 (zone3) + 0 (zone4) = 5
     [ "${after}" -eq 5 ]
 }

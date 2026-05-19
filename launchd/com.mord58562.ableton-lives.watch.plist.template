@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.atm.watch</string>
+    <string>com.mord58562.ableton-lives.watch</string>
 
     <key>ProgramArguments</key>
     <array>
         <string>/bin/zsh</string>
-        <string>{{ATM_HOME}}/bin/atm-watch.sh</string>
+        <string>{{LIVES_HOME}}/bin/lives-watch.sh</string>
     </array>
 
     <key>WatchPaths</key>
     <array>
-        <string>{{ATM_INTERNAL_PATH}}</string>
+        <string>{{LIVES_INTERNAL_PATH}}</string>
 {{WATCHPATH_INTERNAL_LIVE_RECORDINGS}}
 {{WATCHPATH_USB}}
     </array>
@@ -26,8 +26,8 @@
     <false/>
 
     <key>StandardOutPath</key>
-    <string>{{ATM_LOG}}</string>
+    <string>{{LIVES_LOG}}</string>
     <key>StandardErrorPath</key>
-    <string>{{ATM_LOG}}</string>
+    <string>{{LIVES_LOG}}</string>
 </dict>
 </plist>

@@ -2,14 +2,14 @@
 # release.sh - build a public release tarball.
 #
 # Strips machine-local files (presets/local.preset, this user's caches, etc.)
-# and produces ableton-time-machine-<version>.tar.gz.
+# and produces ableton-lives-<version>.tar.gz.
 
 set -euo pipefail
 
 VERSION="${1:-$(date '+%Y.%m.%d')}"
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="${SRC}/dist"
-STAGE="${OUT_DIR}/ableton-time-machine-${VERSION}"
+STAGE="${OUT_DIR}/ableton-lives-${VERSION}"
 
 rm -rf "${STAGE}"
 mkdir -p "${STAGE}"
@@ -20,7 +20,7 @@ rsync -a --exclude '.git' \
          --exclude 'presets/local.preset' \
          --exclude 'presets/local.preset.stash' \
          --exclude 'RECON.md' \
-         --exclude '.atm-*' \
+         --exclude '.ableton-lives-*' \
          --exclude '*.log' \
          --exclude '.DS_Store' \
          --exclude 'tests/fixtures/*.als.bak' \
@@ -51,5 +51,5 @@ if grep -RIn '/Users/[a-zA-Z]' "${STAGE}" --exclude-dir=.git \
 fi
 
 cd "${OUT_DIR}"
-tar -czf "ableton-time-machine-${VERSION}.tar.gz" "ableton-time-machine-${VERSION}"
-printf 'Built: %s/ableton-time-machine-%s.tar.gz\n' "${OUT_DIR}" "${VERSION}"
+tar -czf "ableton-lives-${VERSION}.tar.gz" "ableton-lives-${VERSION}"
+printf 'Built: %s/ableton-lives-%s.tar.gz\n' "${OUT_DIR}" "${VERSION}"

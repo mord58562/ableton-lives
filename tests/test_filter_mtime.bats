@@ -1,35 +1,35 @@
 #!/usr/bin/env bats
-# test_filter_mtime.bats - Tests for atm-watch.sh mtime filter logic.
+# test_filter_mtime.bats - Tests for lives-watch.sh mtime filter logic.
 # Exercises: .als mtime < 30s is included; mtime > 30s is excluded;
 # non-.als files excluded; _versions/ paths excluded; absent USB2 handled.
 
 setup() {
-    TEST_DIR="$(mktemp -d /tmp/atm-test-mtime.XXXXXX)"
+    TEST_DIR="$(mktemp -d /tmp/lives-test-mtime.XXXXXX)"
     export TEST_DIR
 
-    # Override all ATM paths to temp dirs
-    export ATM_CONFIG=/dev/null
-    export ATM_VERSIONS_DIR="${TEST_DIR}/_versions"
-    export ATM_LOG="${TEST_DIR}/atm.log"
-    export ATM_SEEN_HASHES="${TEST_DIR}/.atm-seen-hashes"
-    export ATM_SUMMARY="${TEST_DIR}/.atm-summary"
-    export ATM_LOCKFILE="${TEST_DIR}/atm-watch.lock"
-    export ATM_MTIME_WINDOW=30
+    # Override all Ableton Lives paths to temp dirs
+    export LIVES_CONFIG=/dev/null
+    export LIVES_VERSIONS_DIR="${TEST_DIR}/_versions"
+    export LIVES_LOG="${TEST_DIR}/atm.log"
+    export LIVES_SEEN_HASHES="${TEST_DIR}/.ableton-lives-seen-hashes"
+    export LIVES_SUMMARY="${TEST_DIR}/.ableton-lives-summary"
+    export LIVES_LOCKFILE="${TEST_DIR}/lives-watch.lock"
+    export LIVES_MTIME_WINDOW=30
 
     # Internal path: use a writable temp dir
-    export ATM_INTERNAL_PATH="${TEST_DIR}/internal"
+    export LIVES_INTERNAL_PATH="${TEST_DIR}/internal"
     # USB2: default to nonexistent path (tested per-test)
-    export ATM_USB_PATH="${TEST_DIR}/usb2_absent"
+    export LIVES_USB_PATH="${TEST_DIR}/usb2_absent"
 
-    mkdir -p "${ATM_VERSIONS_DIR}"
-    mkdir -p "${ATM_INTERNAL_PATH}"
+    mkdir -p "${LIVES_VERSIONS_DIR}"
+    mkdir -p "${LIVES_INTERNAL_PATH}"
 
-    WATCH_SCRIPT="$(cd "$(dirname "${BATS_TEST_FILENAME}")/.." && pwd)/bin/atm-watch.sh"
+    WATCH_SCRIPT="$(cd "$(dirname "${BATS_TEST_FILENAME}")/.." && pwd)/bin/lives-watch.sh"
 }
 
 teardown() {
     rm -rf "${TEST_DIR}"
-    rm -f "${ATM_LOCKFILE}" 2>/dev/null || true
+    rm -f "${LIVES_LOCKFILE}" 2>/dev/null || true
 }
 
 # Helper: create a reference file with mtime N seconds in the past
@@ -51,7 +51,7 @@ find_newer_than() {
 
 @test "copies_file_modified_within_30s - fresh .als appears in candidate scan" {
     # Create a fresh .als file (mtime = now)
-    local als_file="${ATM_INTERNAL_PATH}/myproject/my_track.als"
+    local als_file="${LIVES_INTERNAL_PATH}/myproject/my_track.als"
     mkdir -p "$(dirname "${als_file}")"
     cp "${FIXTURE}" "${als_file}"
     touch "${als_file}"  # set mtime to now
@@ -66,7 +66,7 @@ find_newer_than() {
 }
 
 @test "skips_file_modified_60s_ago - stale .als not in candidate scan" {
-    local als_file="${ATM_INTERNAL_PATH}/myproject/old_track.als"
+    local als_file="${LIVES_INTERNAL_PATH}/myproject/old_track.als"
     mkdir -p "$(dirname "${als_file}")"
     cp "${FIXTURE}" "${als_file}"
     # Set mtime to 60 seconds ago
@@ -82,7 +82,7 @@ find_newer_than() {
 }
 
 @test "skips_non_als_file - .txt with fresh mtime not in candidates" {
-    local txt_file="${ATM_INTERNAL_PATH}/myproject/notes.txt"
+    local txt_file="${LIVES_INTERNAL_PATH}/myproject/notes.txt"
     mkdir -p "$(dirname "${txt_file}")"
     echo "hello" > "${txt_file}"
     touch "${txt_file}"
@@ -91,13 +91,13 @@ find_newer_than() {
     ref="$(make_ref_file 30)"
 
     # find -name '*.als' should not find a .txt file
-    run bash -c "find '${ATM_INTERNAL_PATH}' -name '*.als' -newer '${ref}' | grep -c 'notes.txt'"
+    run bash -c "find '${LIVES_INTERNAL_PATH}' -name '*.als' -newer '${ref}' | grep -c 'notes.txt'"
     [ "${output}" = "0" ] || [ "${status}" -ne 0 ]
 }
 
 @test "skips_files_in_versions_subdir - .als inside _versions is excluded" {
     # Simulate a file that ended up inside _versions/
-    local versions_file="${ATM_VERSIONS_DIR}/myproject/my_track-20260101-120000.als"
+    local versions_file="${LIVES_VERSIONS_DIR}/myproject/my_track-20260101-120000.als"
     mkdir -p "$(dirname "${versions_file}")"
     cp "${FIXTURE}" "${versions_file}"
     touch "${versions_file}"  # fresh mtime
@@ -105,9 +105,9 @@ find_newer_than() {
     local ref
     ref="$(make_ref_file 30)"
 
-    # The find command in atm-watch.sh excludes */_versions/* paths
+    # The find command in lives-watch.sh excludes */_versions/* paths
     local found
-    found=$(find "${ATM_INTERNAL_PATH}" "${ATM_VERSIONS_DIR}" -name '*.als' -newer "${ref}" \
+    found=$(find "${LIVES_INTERNAL_PATH}" "${LIVES_VERSIONS_DIR}" -name '*.als' -newer "${ref}" \
         -not -path '*/_versions/*' 2>/dev/null || true)
     [ -z "${found}" ]
 }
@@ -115,7 +115,7 @@ find_newer_than() {
 @test "handles_absent_usb2_path - script exits 0 and logs skip when USB2 missing" {
     # USB2 path is already set to a nonexistent dir in setup
     # Internal has a fresh .als so script has something to do
-    local als_file="${ATM_INTERNAL_PATH}/proj/track.als"
+    local als_file="${LIVES_INTERNAL_PATH}/proj/track.als"
     mkdir -p "$(dirname "${als_file}")"
     cp "${FIXTURE}" "${als_file}"
     touch "${als_file}"
@@ -124,6 +124,6 @@ find_newer_than() {
     [ "${status}" -eq 0 ]
 
     # Log should contain the USB2 skip message
-    run grep -i "USB2\|not mounted\|absent" "${ATM_LOG}"
+    run grep -i "USB2\|not mounted\|absent" "${LIVES_LOG}"
     [ "${status}" -eq 0 ]
 }

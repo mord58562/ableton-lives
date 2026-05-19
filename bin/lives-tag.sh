@@ -1,35 +1,35 @@
 #!/usr/bin/env zsh
-# atm-tag.sh - pin a version so it is never pruned.
+# lives-tag.sh - pin a version so it is never pruned.
 #
 # Usage:
-#   atm-tag.sh add  <project> <timestamp> <label>
-#   atm-tag.sh rm   <project> <timestamp>
-#   atm-tag.sh list [<project>]
+#   lives-tag.sh add  <project> <timestamp> <label>
+#   lives-tag.sh rm   <project> <timestamp>
+#   lives-tag.sh list [<project>]
 #
 # Tags are stored in _versions/<project>/_tags as TSV:
 #   <timestamp>\t<label>\t<iso-created>
 #
-# atm-prune.sh consults this file before deleting; any timestamp listed
+# lives-prune.sh consults this file before deleting; any timestamp listed
 # survives every retention zone, including >365d. Useful for "demo-v1",
 # "client-approved", "before-mastering".
 
 set -euo pipefail
 
-ATM_LIB_DIR="${ATM_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
-source "${ATM_LIB_DIR}/atm-config.sh"
-VERSIONS_DIR="${ATM_VERSIONS_DIR}"
+LIVES_LIB_DIR="${LIVES_LIB_DIR:-$(cd "$(dirname "$0")/../lib" && pwd)}"
+source "${LIVES_LIB_DIR}/lives-config.sh"
+VERSIONS_DIR="${LIVES_VERSIONS_DIR}"
 
 usage() {
     cat <<USAGE
 Usage:
-  atm-tag.sh add  <project> <timestamp> <label>
-  atm-tag.sh rm   <project> <timestamp>
-  atm-tag.sh list [<project>]
+  lives-tag.sh add  <project> <timestamp> <label>
+  lives-tag.sh rm   <project> <timestamp>
+  lives-tag.sh list [<project>]
 
 Examples:
-  atm-tag.sh add "intro lessons" 20260512-093045 "demo-v1"
-  atm-tag.sh list "intro lessons"
-  atm-tag.sh rm  "intro lessons" 20260512-093045
+  lives-tag.sh add "intro lessons" 20260512-093045 "demo-v1"
+  lives-tag.sh list "intro lessons"
+  lives-tag.sh rm  "intro lessons" 20260512-093045
 USAGE
     exit 1
 }
