@@ -43,7 +43,7 @@ SYNC_REMOTE="${LIVES_SYNC_REMOTE}"
 SYNC_PATH="${LIVES_SYNC_PATH}"
 
 # Quota guards (defaults set in lib/lives-config.sh; user-tunable via
-# `atm config set LIVES_REMOTE_CAP_GB 50` etc.). All integer GB.
+# `bin/lives-config.sh set LIVES_REMOTE_CAP_GB 50` etc.). All integer GB.
 
 # Safety: cap how many files a single sync can delete, so a wiped local
 # _versions/ cannot nuke the entire remote in one run. Google Drive trash
@@ -227,12 +227,12 @@ if [[ "${sync_ok}" -eq 0 ]]; then
     log "FAILED after ${sync_dur}s: ${last_err:-see log}"
     lives_notify_event "sync.run" "error" "Ableton Lives sync failed" \
         "${last_err:-rclone exited non-zero} (after ${sync_dur}s). See log for full trace."
-    _atm_sync_status="failed"
+    _lives_sync_status="failed"
 else
     log "ok in ${sync_dur}s"
     lives_notify_event "sync.run" "ok" "Ableton Lives sync recovered" \
         "Backup is current again (took ${sync_dur}s)."
-    _atm_sync_status="ok"
+    _lives_sync_status="ok"
 fi
 
 # ---------------------------------------------------------------------------
@@ -275,7 +275,7 @@ tmp_sum="${SUMMARY}.sync.tmp.$$"
 grep -v '^LIVES_SYNC_' "${SUMMARY}" > "${tmp_sum}" 2>/dev/null || true
 {
     printf 'LIVES_SYNC_LAST_RUN=%s\n' "${now_iso}"
-    printf 'LIVES_SYNC_LAST_STATUS=%s\n' "${_atm_sync_status}"
+    printf 'LIVES_SYNC_LAST_STATUS=%s\n' "${_lives_sync_status}"
     printf 'LIVES_SYNC_LAST_DURATION_S=%d\n' "${sync_dur}"
     printf 'LIVES_SYNC_REMOTE_BYTES=%d\n' "${remote_bytes}"
     printf 'LIVES_SYNC_DRIVE_USED_BYTES=%d\n' "${post_used_bytes:-0}"
@@ -283,7 +283,7 @@ grep -v '^LIVES_SYNC_' "${SUMMARY}" > "${tmp_sum}" 2>/dev/null || true
 } >> "${tmp_sum}"
 mv "${tmp_sum}" "${SUMMARY}"
 
-if [[ "${_atm_sync_status}" = "failed" ]]; then
+if [[ "${_lives_sync_status}" = "failed" ]]; then
     exit 1
 fi
 exit 0

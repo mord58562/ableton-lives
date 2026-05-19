@@ -218,7 +218,7 @@ This installer will:
   • Run a daily retention pruner so storage stays small
   • Optionally sync to Google Drive with end-to-end encryption
   • Tag the closest version before any Ableton crash, automatically
-  • Install a menu-bar status item (xbar / SwiftBar)
+  • Install a native SwiftUI menubar status item
 
 Source location: ${C_DIM}${LIVES_HOME}${C_RESET}
 
@@ -238,6 +238,27 @@ if [[ "$(uname)" = "Darwin" ]]; then
 else
     fail "Ableton Lives is macOS-only (uname is $(uname))."; exit 1
 fi
+
+# Xcode Command Line Tools provide git, swiftc, codesign, shasum. The
+# `git clone` line on the install page already needs them; double-check
+# here so a stranger who got the source as a download zip still gets a
+# clear actionable message instead of a swiftc-not-found mid-install.
+if ! xcode-select -p >/dev/null 2>&1; then
+    warn "Xcode Command Line Tools not installed."
+    info "Triggering xcode-select --install. A system dialog will pop up;"
+    info "click Install, wait for it to finish (a few minutes), then re-run:"
+    info "    zsh scripts/install.sh"
+    if [[ ${DRY_RUN} -eq 1 ]]; then
+        dry_say "would run: xcode-select --install"
+    else
+        xcode-select --install 2>/dev/null || true
+        exit 1
+    fi
+else
+    ok "Xcode Command Line Tools present"
+    audit "PREFLIGHT" "xcode-select=$(xcode-select -p)"
+fi
+
 command -v zsh >/dev/null && { ok "zsh present"; audit "PREFLIGHT" "zsh=$(command -v zsh)"; } \
     || { fail "zsh required."; exit 1; }
 command -v shasum >/dev/null && { ok "shasum present"; audit "PREFLIGHT" "shasum=$(command -v shasum)"; } \
@@ -340,9 +361,26 @@ DEF_USB=""
 DEF_CAP="20"
 DEF_FLOOR="10"
 
-# Standard Ableton folder existence check - friendlier message if missing.
+# Standard Ableton folder existence check. Ableton Lives is a backup tool
+# for Ableton Live projects; if neither the standard folder nor any
+# Ableton Live app are present, the user is almost certainly trying to
+# install in the wrong order.
 if [[ ! -d "${DEF_INTERNAL}" ]]; then
-    info "Standard Ableton folder ${DEF_INTERNAL} not found - that's fine, you'll choose one below."
+    # Glob check: Apple-style apps live in /Applications/<App>.app
+    has_ableton=0
+    for app in /Applications/Ableton*.app "${HOME}/Applications/Ableton"*.app; do
+        [[ -d "${app}" ]] && { has_ableton=1; break; }
+    done
+    if [[ ${has_ableton} -eq 0 ]]; then
+        warn "Couldn't find Ableton Live in /Applications, and ${DEF_INTERNAL} doesn't exist."
+        info "Ableton Lives is a backup tool for Ableton Live projects. Install"
+        info "Ableton Live first (https://www.ableton.com), open it once so it"
+        info "creates ~/Music/Ableton/, then re-run this installer."
+        prompt_yn "Continue anyway (you'll point at a folder manually)?" n \
+            || { info "Aborted. Install Ableton Live, then re-run."; exit 0; }
+    else
+        info "Standard Ableton folder ${DEF_INTERNAL} not found - that's fine, you'll choose one below."
+    fi
 fi
 
 # Layer in preset (local-only file, gitignored from public release)
@@ -546,6 +584,12 @@ LIVES_USB_PATH="${USB}"
 LIVES_REMOTE_CAP_GB=${CAP}
 LIVES_FREE_FLOOR_GB=${FLOOR}
 LIVES_ENCRYPT_BACKUP=${WANT_ENCRYPT}
+# rclone remote names default to lives-gdrive and lives-crypt (derived
+# from LIVES_ENCRYPT_BACKUP in lib/lives-config.sh). If you upgraded
+# from a pre-rename installation with atm-gdrive / atm-crypt remotes,
+# uncomment and adjust:
+#   LIVES_QUOTA_REMOTE=atm-gdrive
+#   LIVES_SYNC_REMOTE=atm-crypt
 EOF
 )
 if [[ ${DRY_RUN} -eq 1 ]]; then
@@ -634,28 +678,45 @@ if [[ ${DRY_RUN} -eq 1 ]]; then
         audit "WOULD_LOAD" "load ${name}"
     done
     if command -v rclone >/dev/null 2>&1 && rclone listremotes 2>/dev/null | grep -qx "${LIVES_SYNC_REMOTE:-lives-crypt}:"; then
-        dry_say "would: launchctl load ${LAUNCH_AGENTS}/com.mord58562.ableton-lives.sync.plist (sync remote already configured)"
+        dry_say "would: launchctl bootstrap gui/$(id -u) ${LAUNCH_AGENTS}/com.mord58562.ableton-lives.sync.plist (sync remote already configured)"
         audit "WOULD_LOAD" "load com.mord58562.ableton-lives.sync"
     else
         dry_say "would NOT load com.mord58562.ableton-lives.sync.plist yet (sync remote not configured; lives-sync-setup.sh handles it)"
     fi
 else
+    # launchctl bootstrap/bootout are the macOS 12+ replacements for
+    # load/unload. Fall through to the legacy commands if bootstrap is
+    # rejected (older macOS, or an SIP edge case) so the install never
+    # leaves agents in an inconsistent state.
+    lc_uid="gui/$(id -u)"
+    lc_unload_one() {
+        local plist="$1"
+        local label="$(basename "${plist}" .plist)"
+        launchctl bootout "${lc_uid}/${label}" 2>/dev/null \
+            || launchctl unload "${plist}" 2>/dev/null \
+            || true
+    }
+    lc_load_one() {
+        local plist="$1"
+        launchctl bootstrap "${lc_uid}" "${plist}" 2>/dev/null \
+            || launchctl load "${plist}" 2>/dev/null
+    }
     for name in "${PLIST_NAMES[@]}"; do
-        launchctl unload "${LAUNCH_AGENTS}/${name}.plist" 2>/dev/null || true
+        lc_unload_one "${LAUNCH_AGENTS}/${name}.plist"
     done
-    launchctl load "${LAUNCH_AGENTS}/com.mord58562.ableton-lives.watch.plist"
-    launchctl load "${LAUNCH_AGENTS}/com.mord58562.ableton-lives.prune.plist"
-    launchctl load "${LAUNCH_AGENTS}/com.mord58562.ableton-lives.verify.plist"
-    launchctl load "${LAUNCH_AGENTS}/com.mord58562.ableton-lives.crash.plist"
+    lc_load_one "${LAUNCH_AGENTS}/com.mord58562.ableton-lives.watch.plist"
+    lc_load_one "${LAUNCH_AGENTS}/com.mord58562.ableton-lives.prune.plist"
+    lc_load_one "${LAUNCH_AGENTS}/com.mord58562.ableton-lives.verify.plist"
+    lc_load_one "${LAUNCH_AGENTS}/com.mord58562.ableton-lives.crash.plist"
     ok "Loaded watch, prune, verify, crash agents"
     if [[ -d "${LIVES_HOME}/swift/AbletonLives.app" ]]; then
-        launchctl load "${LAUNCH_AGENTS}/com.mord58562.ableton-lives.menubar.plist"
+        lc_load_one "${LAUNCH_AGENTS}/com.mord58562.ableton-lives.menubar.plist"
         ok "Loaded menubar agent"
     else
         info "Menubar app not built; skipping its agent."
     fi
-    if rclone listremotes 2>/dev/null | grep -qx 'lives-crypt:'; then
-        launchctl load "${LAUNCH_AGENTS}/com.mord58562.ableton-lives.sync.plist"
+    if rclone listremotes 2>/dev/null | grep -qx "${LIVES_SYNC_REMOTE:-lives-crypt}:"; then
+        lc_load_one "${LAUNCH_AGENTS}/com.mord58562.ableton-lives.sync.plist"
         ok "Loaded sync agent (rclone crypt remote already configured)"
     fi
 fi

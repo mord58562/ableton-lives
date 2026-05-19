@@ -1,134 +1,135 @@
 # Ableton Lives
 
-Automatic versioning, encrypted cloud backup, and crash-recovery for Ableton
-Live projects on macOS.
+Automatic per-`.als` versioning and encrypted backup for Ableton Live projects on macOS. The watcher captures every save within 30 seconds as a content-addressed snapshot, stores it under an internal `_versions/` tree, optionally mirrors to an external drive, and optionally syncs nightly to Google Drive through `rclone crypt` so the cloud only ever sees opaque blobs. A SwiftUI menubar app reports state at a glance. Unlike folder-level rsync backups, every `.als` save is a discrete restorable version with verifiable integrity, and restore happens from a Finder right-click rather than a backup app.
 
-Every save of a `.als` file is captured within 30 seconds and stored as a
-timestamped snapshot. Finished audio exports (`.wav`, `.aiff`, `.mp3`,
-`.flac`, etc.) are mirrored too. A daily retention policy keeps storage
-small. Optionally, the entire version store is mirrored nightly to Google
-Drive with end-to-end encryption — Google sees only opaque blobs. When
-Ableton crashes, the closest preceding version is automatically tagged
-so the right snapshot is one click away.
+## Screenshot
 
-Pure zsh + macOS built-ins. No Python, no Electron, no resident daemon
-RAM. The only optional dependency is `rclone` (for cloud sync).
+![menubar](docs/screenshots/menubar.png)
 
-## Features
+## Requirements
 
-- **Versioning** — every `.als` save deduped and timestamped within 30s
-- **Export capture** — finished audio renders are versioned alongside `.als`
-- **Tiered retention** — 24h all / 30d hourly / 180d daily / 365d weekly / delete
-- **Encrypted cloud sync** — `rclone crypt` to Google Drive (or any rclone backend)
-- **Hard storage caps** — sync refuses if local or Drive limits would be breached
-- **Crash recovery** — Ableton crash detected → closest pre-crash version pinned
-- **Tag/pin** — mark `demo-v1`, `client-approved` etc.; tagged versions never pruned
-- **Bundle snapshots** — archive an entire project folder including Samples/
-- **Cloud-only restore** — pull the encrypted backup to a fresh machine
-- **Restore previews** — Quick Action shows BPM, track count, size next to each timestamp
-- **Integrity verifier** — weekly gzip-test on a random sample, catches bit-rot
-- **Menu bar** — xbar / SwiftBar plugin showing status, alerts, recent saves
-- **Smart notifications** — state-transition aware, deduplicated, with audit log
+- macOS 13 (Ventura) or later
+- Apple Silicon (arm64)
+- Ableton Live 11 or 12
+- Optional: a Google account with spare Drive quota (for nightly cloud sync)
+- Optional: an external USB or SSD drive (for an offline second copy)
 
-## Quick start
+Homebrew, Xcode Command Line Tools, `rclone`, and `zstd` are handled by the installer. You do not need to set them up beforehand.
 
-```bash
-git clone https://github.com/<you>/ableton-lives.git
+## Quick install
+
+```sh
+git clone https://github.com/mord58562/ableton-lives.git
 cd ableton-lives
 zsh scripts/install.sh
 ```
 
-The interactive installer asks where your Ableton folder is, whether you
-have an external drive to monitor, your storage cap, and whether to set
-up encrypted cloud sync. Sane defaults throughout — press Return to
-accept any prompt.
+The installer is interactive and tells you what it is about to do at each step. Run it with `--dry-run` first if you want to see every prompt and action without touching the system.
 
-To enable cloud sync later:
+## What the installer does
 
-```bash
-brew install rclone
-bin/lives-sync-setup.sh    # walks you through OAuth + encryption keys
-```
+1. **Preflight checks.** Confirms macOS, `zsh`, `shasum`, and the Xcode Command Line Tools are present. Triggers `xcode-select --install` if the CLT are missing.
+2. **Homebrew.** If `brew` is missing, offers to run the official Homebrew installer. You can decline and stay local-only.
+3. **rclone.** Installs `rclone` via Homebrew unless you opt out. Without `rclone` the tool runs in local-only mode and cloud sync stays disabled.
+4. **zstd.** Installs `zstd` via Homebrew for compact project bundles. Falls back to `gzip` if you skip it.
+5. **Folders to monitor.** Detects your Ableton projects folder (default `~/Music/Ableton`), confirms the path to your User Library, and asks whether you also want to watch an external drive. Missing folders can be created on the spot.
+6. **Storage caps.** Asks for two numbers: the maximum size for the local version store (default 20 GB) and the free-space floor on your Drive (default 10 GB). Either limit pauses sync rather than overrunning your disk or Drive quota.
+7. **Cloud sync intent.** Asks whether to enable nightly sync. If yes, asks whether to encrypt. Encrypted mode (recommended) hides filenames, directory names, and content from Google; unencrypted mode lets you browse the backup from `drive.google.com`.
+8. **Review and confirm.** Shows every choice in one block before writing anything.
+9. **Config file.** Writes `~/.config/ableton-lives/config` with the chosen values.
+10. **Launch agents.** Renders the `launchd` plist templates with your paths and loads the watcher, pruner, verifier, and crash-watcher agents. The menubar agent loads once the app is built. The sync agent loads only after Drive setup finishes.
+11. **Finder Quick Action.** Installs `Restore Ableton Version.workflow` into `~/Library/Services/` so the right-click menu on any `.als` shows a restore option.
+12. **Existing backups import.** If Ableton has been writing its own `Backup/` folders, `lives-import-existing.sh` ingests them into `_versions/` with their original timestamps so no history is lost.
+13. **Menubar app.** Calls `swift/build.sh`, which compiles `AbletonLives.app` with `swiftc` and ad-hoc signs the bundle. The agent loads it on success.
+14. **Drive setup.** If cloud sync is enabled, offers to run `lives-sync-setup.sh` now. That script opens a browser for Google OAuth, generates two strong random passwords for the crypt layer, prints them once for you to save to a password manager, and dry-runs a sync before loading the nightly agent.
 
-## Daily use
+## What you get afterwards
 
-Right-click any `.als` in Finder → **Restore Ableton Version**. Pick a
-timestamp from the list — each line shows the version's BPM, track count
-and size for context. The current file is backed up to `.als.bak` before
-overwrite, so a single undo is always available.
+A menubar app and a set of `lives-*` CLI tools under `bin/`. The watcher, pruner, verifier, and crash-watcher run on their own through `launchd`. You never need to invoke them by hand.
 
-The menu bar plugin shows last save time, version count, Drive usage,
-recent alerts, and a one-click action to run sync immediately.
+### Menubar app
 
-## CLI tools
+`swift/AbletonLives.app` shows current state at a glance: last save time, version count, storage used, sync status, alerts, and a one-click "Sync now" action.
+
+### Finder Quick Action
+
+Right-click any `.als` file in Finder, choose **Restore Ableton Version**, and pick a timestamp. The current file is copied to `.als.bak` before the restore overwrites it, so a single undo is always available.
+
+### CLI tools
 
 ```text
-bin/lives-config.sh            show or change settings (paths, caps, etc.)
-bin/lives-sync.sh              run cloud sync now
-bin/lives-bundle.sh snapshot   archive a whole project folder
-bin/lives-bundle.sh restore    extract a project bundle
-bin/lives-cloud-restore.sh     pull encrypted backup down (disaster recovery)
-bin/lives-tag.sh add           pin a version so it survives forever
-bin/lives-preview.sh           extract BPM / track count from a version
-bin/lives-verify.sh            sample N versions and check integrity
+bin/lives-config.sh           Read or change configuration values (paths, caps, remotes).
+bin/lives-watch.sh            The watcher. Invoked by launchd; scans for recent saves and copies versioned snapshots.
+bin/lives-prune.sh            The retention pruner. Tiered policy keeps storage small.
+bin/lives-restore.sh          List versions for a project or restore one back over the current file.
+bin/lives-tag.sh              Pin a version with a label so it is never pruned.
+bin/lives-preview.sh          Extract BPM, track count, and size from a versioned .als.
+bin/lives-verify.sh           Sample N random versions and check gzip integrity. Catches bit-rot.
+bin/lives-bundle.sh           Snapshot or restore a whole project folder (Samples/, presets, clips, devices).
+bin/lives-sync.sh             Run cloud sync now instead of waiting for the nightly agent.
+bin/lives-sync-setup.sh       One-time interactive Google Drive + encryption setup.
+bin/lives-cloud-restore.sh    Pull the encrypted backup down to a fresh machine.
+bin/lives-crash-watch.sh      Detect Ableton crashes and tag the closest preceding version.
+bin/lives-import-existing.sh  Ingest Ableton's own Backup/ files into _versions/ on first install.
 ```
+
+## How it works
+
+- Every `.als` save is detected by a `launchd` watcher within roughly 30 seconds, deduplicated by SHA-256, and copied to `~/Music/Ableton/_versions/<project>/<basename>-YYYYMMDD-HHMMSS.als`.
+- A daily pruner keeps storage bounded: all versions for the last 24 hours, hourly for 30 days, daily for 6 months, weekly for a year, then deleted. Tagged versions are never pruned.
+- A weekly verifier picks random versions and re-tests their gzip integrity to catch silent disk corruption.
+- A crash watcher reads `~/Library/Logs/DiagnosticReports/` and, on a new Ableton crash, automatically pins the closest preceding version with a `crash-recovery` label.
+- Cloud sync runs nightly at 04:30 with `rclone sync` against an `rclone crypt` remote. Filenames, directory names, and content are encrypted client-side; the keys live only in `~/.config/rclone/rclone.conf` on your machine.
+- Configuration lives at `~/.config/ableton-lives/config` and is editable by hand or through `bin/lives-config.sh set KEY VALUE`.
+- Logs go to `~/Library/Logs/ableton-lives.log` (rotated weekly).
 
 ## Storage caps
 
-Ableton Lives has a hard ceiling on how much it will store, defaulting to **20 GB**.
-If your version store grows past the cap, sync refuses rather than risk
-filling your Drive. Tune any time:
+Two limits, both adjustable.
 
-```bash
+```sh
 bin/lives-config.sh set LIVES_REMOTE_CAP_GB 50
 bin/lives-config.sh set LIVES_FREE_FLOOR_GB 5
 ```
 
-A soft notification fires at 75% of the cap so you have time to react.
+If the local version store exceeds `LIVES_REMOTE_CAP_GB`, sync stops uploading until the pruner shrinks it. If your Drive free space drops below `LIVES_FREE_FLOOR_GB`, sync pauses so the rest of your Drive is not squeezed.
 
-## Multi-machine
+## Cloud restore
 
-Point a second Mac at the same `lives-crypt:` remote (using the same
-passwords), and both machines share one encrypted version store. For
-true bidirectional sync, use `rclone bisync` in place of `rclone sync`
-in `bin/lives-sync.sh`.
+On a fresh Mac, after installing Ableton Lives and re-creating the same `rclone crypt` remote with the same two passwords:
+
+```sh
+bin/lives-cloud-restore.sh
+```
+
+The backup downloads, decrypts, and lands at `~/Music/Ableton/_versions/`. From there the Finder Quick Action restores any `.als` to any location.
 
 ## Privacy
 
-- Cloud content is encrypted client-side. Filenames, directory names,
-  and `.als` content are never readable by Google.
-- Encryption keys live in `~/.config/rclone/rclone.conf` only. They
-  never leave your machine. **Lose them and your cloud backup is
-  unrecoverable** — back them up to a password manager during setup.
-- The crash watcher reads system crash logs at
-  `~/Library/Logs/DiagnosticReports/`. Only filenames and mtimes are
-  used; no crash content is uploaded.
-- A local audit log of notifications is kept at
-  `~/Library/Logs/ableton-lives-notifications.log`. Local only.
+- Cloud content is encrypted client-side. Filenames, directory names, and `.als` content are never visible to Google.
+- Encryption keys live only in `~/.config/rclone/rclone.conf`. They never leave your machine. **Lose them and the cloud backup is unrecoverable.** The setup script prints them once so you can save them to a password manager.
+- The crash watcher reads system crash logs at `~/Library/Logs/DiagnosticReports/`. Only filenames and modification times are used; no crash content is uploaded.
+- A local notification audit log lives at `~/Library/Logs/ableton-lives-notifications.log`. Local only.
 
 ## Uninstall
 
-```bash
+```sh
 zsh scripts/uninstall.sh
 ```
 
-Removes all launchd agents, the Finder Quick Action, and menu bar
-plugin links. Leaves your version store, config, cloud backup, and
-rclone authentication intact. Delete those by hand if you really want
-a full wipe.
+Removes the launch agents, the Quick Action, and the menubar binary. Leaves your version store, config file, cloud backup, and `rclone` authentication intact. Pass `--purge` to also wipe `~/.config/ableton-lives/`, the local `_versions/` tree, and the rclone remotes.
 
 ## Development
 
 Tests use [`bats-core`](https://github.com/bats-core/bats-core):
 
-```bash
+```sh
 brew install bats-core
 bats tests/
 ```
 
-All tests run hermetically in `/tmp/` and never touch the real
-`_versions/` store, real notifications, or any cloud account.
+All tests run hermetically in `/tmp/` and never touch the real version store, real notifications, or any cloud account.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

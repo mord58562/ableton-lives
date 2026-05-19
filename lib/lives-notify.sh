@@ -35,7 +35,7 @@ LIVES_NOTIFY_DEDUP_HOURS="${LIVES_NOTIFY_DEDUP_HOURS:-24}"
 # callers source this lib from scripts with `set -euo pipefail`, where a
 # failing pipeline (grep finding nothing) would propagate up through the
 # command substitution and kill the caller after a successful sync.
-_atm_state_get() {
+_lives_state_get() {
     local key="$1"
     [[ -f "${LIVES_NOTIFY_STATE}" ]] || return 0
     grep -E "^${key}=" "${LIVES_NOTIFY_STATE}" 2>/dev/null | tail -1 | cut -d= -f2- || true
@@ -43,8 +43,8 @@ _atm_state_get() {
 }
 
 # Write/update a key in the state file atomically.
-# Multiple keys per call: _atm_state_set k1 v1 k2 v2 ...
-_atm_state_set() {
+# Multiple keys per call: _lives_state_set k1 v1 k2 v2 ...
+_lives_state_set() {
     mkdir -p "$(dirname "${LIVES_NOTIFY_STATE}")"
     local tmp="${LIVES_NOTIFY_STATE}.tmp.$$"
     : > "${tmp}"
@@ -72,12 +72,12 @@ _atm_state_set() {
 }
 
 # Compute a stable fingerprint over status+message.
-_atm_fingerprint() {
+_lives_fingerprint() {
     printf '%s\n%s' "$1" "$2" | shasum -a 256 | awk '{print $1}'
 }
 
 # Append a line to the audit log.
-_atm_audit_log() {
+_lives_audit_log() {
     local category="$1" event_status="$2" fired="$3" title="$4" message="$5"
     mkdir -p "$(dirname "${LIVES_NOTIFY_LOG}")"
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
@@ -87,7 +87,7 @@ _atm_audit_log() {
 }
 
 # Fire a real macOS notification (no suppression logic here).
-_atm_fire_macos() {
+_lives_fire_macos() {
     local title="$1" message="$2"
     # Escape double quotes for the AppleScript string
     local esc_title="${title//\"/\\\"}"
@@ -101,14 +101,14 @@ lives_notify_event() {
     [[ -z "${category}" || -z "${event_status}" ]] && return 2
 
     local fingerprint
-    fingerprint=$(_atm_fingerprint "${event_status}" "${message}")
+    fingerprint=$(_lives_fingerprint "${event_status}" "${message}")
     local now_epoch
     now_epoch=$(date '+%s')
 
     local prev_fp prev_status prev_fire_epoch
-    prev_fp=$(_atm_state_get "${category}.fingerprint")
-    prev_status=$(_atm_state_get "${category}.status")
-    prev_fire_epoch=$(_atm_state_get "${category}.fire_epoch")
+    prev_fp=$(_lives_state_get "${category}.fingerprint")
+    prev_status=$(_lives_state_get "${category}.status")
+    prev_fire_epoch=$(_lives_state_get "${category}.fire_epoch")
     prev_fire_epoch="${prev_fire_epoch:-0}"
 
     local should_fire=0
@@ -137,23 +137,23 @@ lives_notify_event() {
     if [[ ${should_fire} -eq 1 ]]; then
         fired_field="fired"
         if [[ -z "${LIVES_NO_NOTIFY:-}" ]]; then
-            _atm_fire_macos "${title}" "${message}"
+            _lives_fire_macos "${title}" "${message}"
         fi
-        _atm_state_set \
+        _lives_state_set \
             "${category}.fingerprint" "${fingerprint}" \
             "${category}.status" "${event_status}" \
             "${category}.fire_epoch" "${now_epoch}" \
             "${category}.title" "${title}" \
             "${category}.message" "${message}"
     else
-        _atm_state_set \
+        _lives_state_set \
             "${category}.fingerprint" "${fingerprint}" \
             "${category}.status" "${event_status}" \
             "${category}.title" "${title}" \
             "${category}.message" "${message}"
     fi
 
-    _atm_audit_log "${category}" "${event_status}" "${fired_field}" "${title}" "${message}"
+    _lives_audit_log "${category}" "${event_status}" "${fired_field}" "${title}" "${message}"
     return 0
 }
 
@@ -161,7 +161,7 @@ lives_notify_event() {
 # notification. Useful when a script wants to clear stale state on startup.
 lives_notify_clear() {
     local category="$1"
-    _atm_state_set \
+    _lives_state_set \
         "${category}.fingerprint" "" \
         "${category}.status" "ok" \
         "${category}.title" "" \

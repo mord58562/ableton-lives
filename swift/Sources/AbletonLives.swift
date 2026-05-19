@@ -68,8 +68,8 @@ struct LivesSnapshot {
     var localBytes: Int64? = nil        // size of Ableton Lives' local store
 
     // Ableton Lives' own cap (from config) and what's currently in the cloud.
-    var atmRemoteBytes: Int64? = nil    // bytes Ableton Lives has uploaded
-    var atmCapBytes: Int64? = nil       // user's configured cap
+    var livesRemoteBytes: Int64? = nil    // bytes Ableton Lives has uploaded
+    var livesCapBytes: Int64? = nil       // user's configured cap
 
     var driveUsedBytes: Int64? = nil    // entire Google Drive used
     var driveTotalBytes: Int64? = nil   // entire Google Drive plan
@@ -119,7 +119,7 @@ struct LivesPaths {
     let notifyLog: String
     let crashMarker: String
     let alertsClearedAt: String  // cutoff file; alerts <= this ISO ts are hidden
-    let atmCapBytes: Int64    // hard ceiling from LIVES_REMOTE_CAP_GB
+    let livesCapBytes: Int64    // hard ceiling from LIVES_REMOTE_CAP_GB
 
     static func resolve() -> LivesPaths {
         let home = NSHomeDirectory()
@@ -173,7 +173,7 @@ struct LivesPaths {
                         notifyLog: notify,
                         crashMarker: crashMk,
                         alertsClearedAt: clearedAt,
-                        atmCapBytes: capBytes)
+                        livesCapBytes: capBytes)
     }
 }
 
@@ -200,9 +200,9 @@ extension LivesSnapshot {
         }
         if let remote = summary["LIVES_SYNC_REMOTE_BYTES"].flatMap(Int64.init),
            remote > 0 {
-            s.atmRemoteBytes = remote
+            s.livesRemoteBytes = remote
         }
-        s.atmCapBytes = paths.atmCapBytes
+        s.livesCapBytes = paths.livesCapBytes
         if let st = summary["LIVES_SYNC_LAST_STATUS"], !st.isEmpty {
             s.lastSyncStatus = st
         }
@@ -644,11 +644,11 @@ struct StatsView: View {
             // Two storage progress bars. Bars do the visual work;
             // numbers below are the precise readout. No grid alignment
             // to fight - each block stands on its own.
-            let atmUsed = snapshot.atmRemoteBytes ?? snapshot.localBytes ?? 0
-            let atmCap  = snapshot.atmCapBytes ?? 0
+            let livesUsed = snapshot.livesRemoteBytes ?? snapshot.localBytes ?? 0
+            let livesCap  = snapshot.livesCapBytes ?? 0
             storageBar(title: "Ableton Lives",
-                       used: atmUsed,
-                       total: atmCap)
+                       used: livesUsed,
+                       total: livesCap)
 
             if let dUsed = snapshot.driveUsedBytes,
                let dTotal = snapshot.driveTotalBytes, dTotal > 0 {
